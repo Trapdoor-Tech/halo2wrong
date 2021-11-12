@@ -2,13 +2,14 @@ use crate::circuit::ecc::{AssignedPoint, EccChip, EccConfig, EccInstruction, Poi
 use crate::circuit::integer::{IntegerChip, IntegerConfig, IntegerInstructions};
 use crate::circuit::AssignedInteger;
 use crate::rns::Integer;
+use crate::NUMBER_OF_LIMBS;
 use halo2::arithmetic::{CurveAffine, FieldExt};
 use halo2::circuit::{Chip, Region};
 use halo2::plonk::{Circuit, ConstraintSystem, Error};
+use num_bigint::BigUint as big_uint;
 // use secp256k1::Signature;
 
 use crate::rns::Rns;
-
 
 #[derive(Clone, Debug)]
 struct EcdsaConfig {
@@ -16,12 +17,13 @@ struct EcdsaConfig {
     scalar_config: IntegerConfig,
 }
 
-struct EcdsaChip<C: CurveAffine, ScalarField: FieldExt> {
+/// E is the emulated curve, C is the native curve
+struct EcdsaChip<E: CurveAffine, C: CurveAffine> {
     config: EcdsaConfig,
     // chip to do secp256k1 ecc arithmetic
-    ecc_chip: EccChip,
+    ecc_chip: EccChip<E, C>,
     // chip to do arithmetic over secp256k1's scalar field
-    scalar_chip: IntegerChip<ScalarField, C::ScalarExt>,
+    scalar_chip: IntegerChip<E::ScalarExt, C::ScalarExt>,
 }
 
 // impl<C: CurveAffine, ScalarField: FieldExt> Chip<C::ScalarExt> for EcdsaChip<C, ScalarField> {
@@ -37,28 +39,20 @@ struct EcdsaChip<C: CurveAffine, ScalarField: FieldExt> {
 //     }
 // }
 
-impl<C: CurveAffine, N: FieldExt> EcdsaChip<C, N> {
-    pub fn new(config: EcdsaConfig, ecc_chip: EccChip, scalar_chip: IntegerChip<N, C::ScalarExt>) -> Self {
+impl<E: CurveAffine, C: CurveAffine> EcdsaChip<E, C> {
+    pub fn new(config: EcdsaConfig, ecc_chip: EccChip<E, C>, scalar_chip: IntegerChip<E::ScalarExt, C::ScalarExt>) -> Self {
         EcdsaChip { config, ecc_chip, scalar_chip }
     }
 
-    pub fn configure(_: &mut ConstraintSystem<N>, ecc_chip_config: &EccConfig, scalar_config: &IntegerConfig) -> EcdsaConfig {
+    pub fn configure(_: &mut ConstraintSystem<C::ScalarExt>, ecc_chip_config: &EccConfig, scalar_config: &IntegerConfig) -> EcdsaConfig {
         EcdsaConfig {
             ecc_chip_config: ecc_chip_config.clone(),
             scalar_config: scalar_config.clone(),
         }
     }
 
-    // fn ecc_chip(&self) -> EccChip {
-    //     EccChip::new(self.config.range_config.clone(), bit_len_lookup)
-    // }
-
-    fn scalar_chip(&self) -> IntegerChip<N, C::ScalarExt> {
-        let scalar_config = self.config.scalar_config.clone();
-
-        let bit_len_limb = 64;
-        let rns = Rns::<N, C::ScalarExt>::construct(bit_len_limb);
-        IntegerChip::<N, C::ScalarExt>::new(scalar_config, rns)
+    fn scalar_chip(&self) -> &IntegerChip<E::ScalarExt, C::ScalarExt> {
+        &self.scalar_chip
     }
 }
 
@@ -82,7 +76,7 @@ pub struct AssignedPublicKey<C: CurveAffine> {
     pub point: AssignedPoint<C>,
 }
 
-impl<C: CurveAffine, ScalarField: FieldExt> EcdsaChip<C, ScalarField> {
+impl<E: CurveAffine, C: CurveAffine> EcdsaChip<E, C> {
     fn verify(
         &self,
         region: &mut Region<'_, C::ScalarExt>,
@@ -102,7 +96,7 @@ impl<C: CurveAffine, ScalarField: FieldExt> EcdsaChip<C, ScalarField> {
         scalar_chip.assert_not_zero(region, &sig.s, offset)?;
 
         // 2. w = s^(-1) (mod n)
-        let s_inv = scalar_chip.invert(region, &sig.s, offset)?;
+        let (s_inv, _) = scalar_chip.invert(region, &sig.s, offset)?;
 
         // 3. u1 = m' * w (mod n)
         let u1 = scalar_chip.mul(region, &msg_hash, &s_inv, offset)?;
@@ -111,13 +105,13 @@ impl<C: CurveAffine, ScalarField: FieldExt> EcdsaChip<C, ScalarField> {
         let u2 = scalar_chip.mul(region, &sig.r, &s_inv, offset)?;
 
         // 5. compute Q = u1*G + u2*pk
-        // let _g = Point {
-        //     x: Default::default(),
-        //     y: Default::default(),
-        // };
-        // let g = self.ecc_chip.assign_point(region, _g, offset)?;
+        let g1 = self.ecc_chip.mul_fix(region, E::generator(), u1, offset)?;
+        let g2 = self.ecc_chip.mul_var(region, pk.point.clone(), u2, offset)?;
+        let Q = self.ecc_chip.add(region, g1, g2, offset)?;
 
         // 6. check if Q.x == r (mod n)
+        let Q_x = Q.x.clone();
+        scalar_chip.assert_equal(region, &Q_x, &sig.r, offset)?;
 
         Ok(())
     }
