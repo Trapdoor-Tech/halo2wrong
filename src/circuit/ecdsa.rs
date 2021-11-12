@@ -9,11 +9,10 @@ use halo2::plonk::{Circuit, ConstraintSystem, Error};
 
 use crate::rns::Rns;
 
-
 #[derive(Clone, Debug)]
-struct EcdsaConfig {
-    ecc_chip_config: EccConfig, // ecc
-    scalar_config: IntegerConfig,
+pub struct EcdsaConfig {
+    pub ecc_chip_config: EccConfig, // ecc
+    pub scalar_config: IntegerConfig,
 }
 
 struct EcdsaChip<C: CurveAffine, ScalarField: FieldExt> {
@@ -22,6 +21,9 @@ struct EcdsaChip<C: CurveAffine, ScalarField: FieldExt> {
     ecc_chip: EccChip,
     // chip to do arithmetic over secp256k1's scalar field
     scalar_chip: IntegerChip<ScalarField, C::ScalarExt>,
+
+    // TODO: there should be two rns
+    rns: Rns<ScalarField, C::ScalarExt>,
 }
 
 // impl<C: CurveAffine, ScalarField: FieldExt> Chip<C::ScalarExt> for EcdsaChip<C, ScalarField> {
@@ -38,11 +40,23 @@ struct EcdsaChip<C: CurveAffine, ScalarField: FieldExt> {
 // }
 
 impl<C: CurveAffine, N: FieldExt> EcdsaChip<C, N> {
-    pub fn new(config: EcdsaConfig, ecc_chip: EccChip, scalar_chip: IntegerChip<N, C::ScalarExt>) -> Self {
-        EcdsaChip { config, ecc_chip, scalar_chip }
+    pub fn new(config: EcdsaConfig, rns: Rns<N, C::ScalarExt>) -> Self {
+        // TODO: rns1
+        let bit_len_limb = 64;
+        let rns = Rns::<N, C::ScalarExt>::construct(bit_len_limb);
+        let scalar_chip = IntegerChip::<N, C::ScalarExt>::new(config.scalar_config.clone(), rns.clone());
+
+        // TODO: rns2
+        let ecc_chip = EccChip { config: config.scalar_config.clone() };
+        EcdsaChip {
+            config,
+            ecc_chip,
+            scalar_chip,
+            rns,
+        } // TODO: rns should be different
     }
 
-    pub fn configure(_: &mut ConstraintSystem<N>, ecc_chip_config: &EccConfig, scalar_config: &IntegerConfig) -> EcdsaConfig {
+    pub fn configure(_: &mut ConstraintSystem<C::ScalarExt>, ecc_chip_config: &EccConfig, scalar_config: &IntegerConfig) -> EcdsaConfig {
         EcdsaConfig {
             ecc_chip_config: ecc_chip_config.clone(),
             scalar_config: scalar_config.clone(),
@@ -56,12 +70,13 @@ impl<C: CurveAffine, N: FieldExt> EcdsaChip<C, N> {
     fn scalar_chip(&self) -> IntegerChip<N, C::ScalarExt> {
         let scalar_config = self.config.scalar_config.clone();
 
-        let bit_len_limb = 64;
-        let rns = Rns::<N, C::ScalarExt>::construct(bit_len_limb);
-        IntegerChip::<N, C::ScalarExt>::new(scalar_config, rns)
+        // TODO
+        IntegerChip::<N, C::ScalarExt>::new(scalar_config, self.rns.clone())
     }
 }
 
+// TODO: are these traits all available?
+#[derive(Default, Clone, Debug)]
 pub struct EcdsaSig<F: FieldExt> {
     pub r: Integer<F>,
     pub s: Integer<F>,
@@ -102,7 +117,9 @@ impl<C: CurveAffine, ScalarField: FieldExt> EcdsaChip<C, ScalarField> {
         scalar_chip.assert_not_zero(region, &sig.s, offset)?;
 
         // 2. w = s^(-1) (mod n)
-        let s_inv = scalar_chip.invert(region, &sig.s, offset)?;
+
+        // since s > 0, s_inv must exist
+        let (s_inv, _s_cond) = scalar_chip.invert(region, &sig.s, offset)?;
 
         // 3. u1 = m' * w (mod n)
         let u1 = scalar_chip.mul(region, &msg_hash, &s_inv, offset)?;
@@ -123,140 +140,147 @@ impl<C: CurveAffine, ScalarField: FieldExt> EcdsaChip<C, ScalarField> {
     }
 }
 
-// mod tests {
-//     use crate::circuit::ecdsa::AssignedEcdsaSig;
-//     use crate::circuit::ecdsa::AssignedPoint;
-//     use crate::circuit::ecdsa::EccConfig;
-//     use crate::circuit::ecdsa::EcdsaChip;
-//     use crate::circuit::ecdsa::EcdsaConfig;
-//     use crate::circuit::ecdsa::EcdsaSig;
-//     use crate::circuit::ecdsa::Point;
-//     use crate::circuit::integer::IntegerChip;
-//     use crate::circuit::main_gate::MainGate;
-//     use crate::circuit::range::RangeChip;
-//     use crate::rns::Integer;
-//     use crate::rns::Rns;
-//     use halo2::arithmetic::{CurveAffine, FieldExt};
-//     use halo2::circuit::SimpleFloorPlanner;
-//     use halo2::circuit::{Chip, Layouter, Region};
-//     use halo2::plonk::ConstraintSystem;
-//     use halo2::plonk::{Circuit, Error};
+mod tests {
+    use crate::circuit::ecc::EccInstruction;
+    use crate::circuit::ecdsa::AssignedEcdsaSig;
+    use crate::circuit::ecdsa::AssignedPoint;
+    use crate::circuit::ecdsa::EccConfig;
+    use crate::circuit::ecdsa::EcdsaChip;
+    use crate::circuit::ecdsa::EcdsaConfig;
+    use crate::circuit::ecdsa::EcdsaSig;
+    use crate::circuit::ecdsa::Point;
+    use crate::circuit::integer::IntegerChip;
+    use crate::circuit::integer::IntegerInstructions;
+    use crate::circuit::main_gate::MainGate;
+    use crate::circuit::range::RangeChip;
+    use crate::rns::Integer;
+    use crate::rns::Rns;
+    use halo2::arithmetic::{CurveAffine, FieldExt};
+    use halo2::circuit::SimpleFloorPlanner;
+    use halo2::circuit::{Chip, Layouter, Region};
+    use halo2::plonk::ConstraintSystem;
+    use halo2::plonk::{Circuit, Error};
+    use crate::circuit::ecdsa::AssignedPublicKey;
 
-//     #[derive(Clone, Debug)]
-//     struct TestCircuitEcdsaVerifyConfig {
-//         ecdsa_config: EcdsaConfig,
-//     }
+    #[derive(Clone, Debug)]
+    struct TestCircuitEcdsaVerifyConfig {
+        ecdsa_verify_config: EcdsaConfig,
+    }
 
-//     impl TestCircuitEcdsaVerifyConfig {}
+    impl TestCircuitEcdsaVerifyConfig {}
 
-//     #[derive(Default, Clone, Debug)]
-//     struct TestCircuitEcdsaVerify<C: CurveAffine, N: FieldExt> {
-//         sig: EcdsaSig<N>,
-//         pk: Point<C>,
-//         msg_hash: Option<Integer<N>>,
-//         rns: Rns<C::ScalarExt, N>,
-//     }
+    #[derive(Default, Clone, Debug)]
+    struct TestCircuitEcdsaVerify<C: CurveAffine, N: FieldExt> {
+        sig: EcdsaSig<C::ScalarExt>,
+        pk: Point<C>,
+        msg_hash: Option<Integer<C::ScalarExt>>,
+        rns: Rns<N, C::ScalarExt>,
+    }
 
-//     impl<C: CurveAffine, N: FieldExt> Circuit<N> for TestCircuitEcdsaVerify<C, N> {
-//         type Config = TestCircuitEcdsaVerifyConfig;
-//         type FloorPlanner = SimpleFloorPlanner;
+    impl<C: CurveAffine, N: FieldExt> Circuit<C::ScalarExt> for TestCircuitEcdsaVerify<C, N> {
+        type Config = TestCircuitEcdsaVerifyConfig;
+        type FloorPlanner = SimpleFloorPlanner;
 
-//         fn without_witnesses(&self) -> Self {
-//             Self::default()
-//         }
+        fn without_witnesses(&self) -> Self {
+            Self::default()
+        }
 
-//         fn configure(meta: &mut ConstraintSystem<N>) -> Self::Config {
-//             let main_gate_config = MainGate::<N>::configure(meta);
+        fn configure(meta: &mut ConstraintSystem<C::ScalarExt>) -> Self::Config {
+            let main_gate_config = MainGate::<C::ScalarExt>::configure(meta);
 
-//             // TODO: what's this used for?
-//             let overflow_bit_lengths = vec![2, 3];
+            // TODO: what's this used for?
+            let overflow_bit_lengths = vec![2, 3];
 
-//             let range_config = RangeChip::<N>::configure(meta, &main_gate_config, overflow_bit_lengths);
-//             let scalar_config = IntegerChip::configure(meta, &range_config, &main_gate_config);
+            let range_config = RangeChip::<C::ScalarExt>::configure(meta, &main_gate_config, overflow_bit_lengths);
+            let scalar_config = IntegerChip::<N, C::ScalarExt>::configure(meta, &range_config, &main_gate_config);
 
-//             let ecc_chip_config = EccConfig {
-//                 integer_chip_config: scalar_config.clone(),
-//             };
+            let ecc_chip_config = EccConfig {
+                integer_chip_config: scalar_config.clone(),
+            };
 
-//             let ecdsa_verify_config = EcdsaChip::<C, N>::configure(meta, &ecc_chip_config, &scalar_config);
-//             TestCircuitEcdsaVerifyConfig { ecdsa_verify_config }
-//         }
+            let ecdsa_verify_config = EcdsaChip::<C, N>::configure(meta, &ecc_chip_config, &scalar_config);
+            TestCircuitEcdsaVerifyConfig { ecdsa_verify_config }
+        }
 
-//         fn synthesize(&self, config: Self::Config, mut layouter: impl Layouter<N>) -> Result<(), Error> {
-//             let ecdsa_chip = EcdsaChip::<C, N>::new(config.clone());
+        fn synthesize(&self, config: Self::Config, mut layouter: impl Layouter<<C as CurveAffine>::ScalarExt>) -> Result<(), Error> {
+            let bit_len_limb = 64;
+            let rns = Rns::<N, C::ScalarExt>::construct(bit_len_limb);
+            let ecdsa_chip = EcdsaChip::<C, N>::new(config.ecdsa_verify_config.clone(), rns);
 
-//             layouter.assign_region(
-//                 || "region 0",
-//                 |mut region| {
-//                     let offset = &mut 0;
+            layouter.assign_region(
+                || "region 0",
+                |mut region| {
+                    let offset = &mut 0;
 
-//                     // TODO: should not do this, instead we should use `assign_sig`
-//                     let r_assigned = ecdsa_chip.scalar_chip.assign_integer(&mut region, self.sig.r.clone(), offset)?;
-//                     let s_assigned = ecdsa_chip.scalar_chip.assign_integer(&mut region, self.sig.s.clone(), offset)?;
-//                     let sig = AssignedEcdsaSig {
-//                         r: r_assigned.clone(),
-//                         s: s_assigned.clone(),
-//                     };
+                    // TODO: should not do this, instead we should use `assign_sig`
+                    let r_assigned = ecdsa_chip.scalar_chip.assign_integer(&mut region, Some(self.sig.r.clone()), offset)?;
+                    let s_assigned = ecdsa_chip.scalar_chip.assign_integer(&mut region, Some(self.sig.s.clone()), offset)?;
+                    let sig = AssignedEcdsaSig {
+                        r: r_assigned.clone(),
+                        s: s_assigned.clone(),
+                    };
 
-//                     // TODO: should not do this, instead we should use `assign_point`
-//                     let x_assigned = ecdsa_chip.scalar_chip.assign_integer(&mut region, self.pk.x.clone(), offset)?;
-//                     let y_assigned = ecdsa_chip.scalar_chip.assign_integer(&mut region, self.pk.y.clone(), offset)?;
-//                     let pk = AssignedPoint {
-//                         x: x_assigned.clone(),
-//                         y: y_assigned.clone(),
-//                     };
+                    // TODO: should not do this, instead we should use `assign_point`
+                    let x_assigned = ecdsa_chip.scalar_chip.assign_integer(&mut region, Some(self.pk.x.clone()), offset)?;
+                    let y_assigned = ecdsa_chip.scalar_chip.assign_integer(&mut region, Some(self.pk.y.clone()), offset)?;
+                    let pk = AssignedPublicKey {
+                        point: AssignedPoint {
+                            x: x_assigned.clone(),
+                            y: y_assigned.clone(),
+                        },
+                    };
 
-//                     let msg_hash = ecdsa_chip.scalar_chip.assign_integer(&mut region, self.msg_hash.clone(), offset)?;
+                    let msg_hash = ecdsa_chip.scalar_chip.assign_integer(&mut region, self.msg_hash.clone(), offset)?;
 
-//                     ecdsa_chip.verify(&mut region, &sig, &pk, &msg_hash, offset)
-//                 },
-//             )?;
+                    ecdsa_chip.verify(&mut region, &sig, &pk, &msg_hash, offset)
+                },
+            )?;
 
-//             Ok(())
-//         }
-//     }
+            Ok(())
+        }
+    }
 
-//     #[cfg(test)]
-//     fn test_ecdsa_verifier() {
-//         use halo2::pasta::Fp as Wrong;
-//         use halo2::pasta::Fq as Native;
+    #[cfg(test)]
+    fn test_ecdsa_verifier() {
+        use halo2::pasta::Fp as Wrong;
+        use halo2::pasta::Fq as Native;
 
-//         let bit_len_limb = 64;
-//         let rns = Rns::<Wrong, Native>::construct(bit_len_limb);
+        let bit_len_limb = 64;
+        let rns = Rns::<Wrong, Native>::construct(bit_len_limb);
 
-//         #[cfg(not(feature = "no_lookup"))]
-//         let k: u32 = (rns.bit_len_lookup + 1) as u32;
-//         #[cfg(feature = "no_lookup")]
-//         let k: u32 = 8;
+        #[cfg(not(feature = "no_lookup"))]
+        let k: u32 = (rns.bit_len_lookup + 1) as u32;
+        #[cfg(feature = "no_lookup")]
+        let k: u32 = 8;
 
-//         let integer_a = rns.rand_prenormalized();
-//         let integer_b = rns.rand_prenormalized();
+        let integer_a = rns.rand_prenormalized();
+        let integer_b = rns.rand_prenormalized();
 
-//         let integer_x = rns.rand_prenormalized();
-//         let integer_y = rns.rand_prenormalized();
+        let integer_x = rns.rand_prenormalized();
+        let integer_y = rns.rand_prenormalized();
 
-//         let integer_m_hash = rns.rand_prenormalized();
+        let integer_m_hash = rns.rand_prenormalized();
 
-//         let sig = EcdsaSig {
-//             r: integer_r.clone(),
-//             s: integer_s.clone(),
-//         };
-//         let pk = Point { x: integer_x, y: integer_y };
-//         let msg_hash = Some(integer_m_hash.clone());
+        let sig = EcdsaSig {
+            r: integer_r.clone(),
+            s: integer_s.clone(),
+        };
+        let pk = Point { x: integer_x, y: integer_y };
+        let msg_hash = Some(integer_m_hash.clone());
 
-//         // testcase: normal
-//         let circuit = TestCircuitEcdsaVerifyConfig::<Wrong, Native> {
-//             sig,
-//             pk,
-//             msg_hash,
-//             rns: rns.clone(),
-//         };
+        // testcase: normal
+        let circuit = TestCircuitEcdsaVerifyConfig::<Wrong, Native> {
+            sig,
+            pk,
+            msg_hash,
+            rns: rns.clone(),
+        };
 
-//         let prover = match MockProver::run(k, &circuit, vec![]) {
-//             Ok(prover) => prover,
-//             Err(e) => panic!("{:#?}", e),
-//         };
+        let prover = match MockProver::run(k, &circuit, vec![]) {
+            Ok(prover) => prover,
+            Err(e) => panic!("{:#?}", e),
+        };
 
-//         assert_eq!(prover.verify(), Ok(()));
-//     }
-// }
+        assert_eq!(prover.verify(), Ok(()));
+    }
+}

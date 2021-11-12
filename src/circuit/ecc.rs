@@ -5,9 +5,11 @@ use halo2::arithmetic::CurveAffine;
 use halo2::circuit::Region;
 use halo2::plonk::Error;
 
+// TODO: are these traits all available?
+#[derive(Default, Clone, Debug)]
 pub struct Point<C: CurveAffine> {
-    x: Integer<C::ScalarExt>,
-    y: Integer<C::ScalarExt>,
+    pub x: Integer<C::ScalarExt>,
+    pub y: Integer<C::ScalarExt>,
 }
 
 impl<C: CurveAffine> Point<C> {
@@ -17,8 +19,10 @@ impl<C: CurveAffine> Point<C> {
 }
 
 pub struct AssignedPoint<C: CurveAffine> {
-    x: AssignedInteger<C::ScalarExt>,
-    y: AssignedInteger<C::ScalarExt>,
+    // TODO: this is unnecessary
+    pub x: AssignedInteger<C::ScalarExt>,
+    // TODO: this is unnecessary
+    pub y: AssignedInteger<C::ScalarExt>,
 }
 
 /// Linear combination term
@@ -29,11 +33,13 @@ pub enum Term<C: CurveAffine> {
 
 #[derive(Clone, Debug)]
 pub struct EccConfig {
-    integer_chip_config: IntegerConfig,
+    // TODO: `pub` is unnecessary?
+    pub integer_chip_config: IntegerConfig,
 }
 
 pub struct EccChip {
-    config: IntegerConfig,
+    // TODO: `pub` is unnecessary?
+    pub config: IntegerConfig,
 }
 
 pub trait EccInstruction<C: CurveAffine> {
