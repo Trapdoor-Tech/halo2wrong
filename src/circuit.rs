@@ -8,6 +8,7 @@ use num_bigint::BigUint as big_uint;
 use std::marker::PhantomData;
 
 mod ecc;
+mod ecdsa;
 mod integer;
 mod main_gate;
 mod range;
