@@ -31,7 +31,7 @@ pub struct IntegerChip<Wrong: FieldExt, Native: FieldExt> {
     rns: Rns<Wrong, Native>,
 }
 
-trait IntegerInstructions<N: FieldExt> {
+pub trait IntegerInstructions<N: FieldExt> {
     fn assign_integer(&self, region: &mut Region<'_, N>, integer: Option<Integer<N>>, offset: &mut usize) -> Result<AssignedInteger<N>, Error>;
     fn range_assign_integer(
         &self,
