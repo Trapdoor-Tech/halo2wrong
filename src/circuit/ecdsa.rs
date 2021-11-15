@@ -57,7 +57,6 @@ impl<E: CurveAffine, C: CurveAffine> EcdsaChip<E, C> {
 
     // TODO: shall we create a new scalar_chip and clone?
     fn scalar_chip(&self) -> IntegerChip<E::ScalarExt, C::ScalarExt> {
-
         let rns = self.scalar_chip.rns.clone();
         IntegerChip::<E::ScalarExt, C::ScalarExt>::new(self.config.scalar_config.clone(), rns.clone())
     }
@@ -99,28 +98,28 @@ impl<E: CurveAffine, C: CurveAffine> EcdsaChip<E, C> {
         // 1. check 0 < r, s < n
 
         // // since `assert_not_zero` already includes a in-field check, we can just call `assert_not_zero`
-        // scalar_chip.assert_in_field(region, &sig.r, offset)?;
+        scalar_chip.assert_in_field(region, &sig.r, offset)?;
         // scalar_chip.assert_in_field(region, &sig.s, offset)?;
-        scalar_chip.assert_not_zero(region, &sig.r, offset)?;
-        scalar_chip.assert_not_zero(region, &sig.s, offset)?;
+        // scalar_chip.assert_not_zero(region, &sig.r, offset)?;
+        // scalar_chip.assert_not_zero(region, &sig.s, offset)?;
 
         // 2. w = s^(-1) (mod n)
-        let (s_inv, _) = scalar_chip.invert(region, &sig.s, offset)?;
+        // let (s_inv, _) = scalar_chip.invert(region, &sig.s, offset)?;
 
-        // 3. u1 = m' * w (mod n)
-        let u1 = scalar_chip.mul(region, &msg_hash, &s_inv, offset)?;
+        // // 3. u1 = m' * w (mod n)
+        // let u1 = scalar_chip.mul(region, &msg_hash, &s_inv, offset)?;
 
-        // 4. u2 = r * w (mod n)
-        let u2 = scalar_chip.mul(region, &sig.r, &s_inv, offset)?;
+        // // 4. u2 = r * w (mod n)
+        // let u2 = scalar_chip.mul(region, &sig.r, &s_inv, offset)?;
 
-        // 5. compute Q = u1*G + u2*pk
-        let g1 = self.ecc_chip.mul_fix(region, E::generator(), u1, offset)?;
-        let g2 = self.ecc_chip.mul_var(region, pk.point.clone(), u2, offset)?;
-        let Q = self.ecc_chip.add(region, g1, g2, offset)?;
+        // // 5. compute Q = u1*G + u2*pk
+        // let g1 = self.ecc_chip.mul_fix(region, E::generator(), u1, offset)?;
+        // let g2 = self.ecc_chip.mul_var(region, pk.point.clone(), u2, offset)?;
+        // let Q = self.ecc_chip.add(region, g1, g2, offset)?;
 
-        // 6. check if Q.x == r (mod n)
-        let Q_x = Q.x.clone();
-        scalar_chip.assert_equal(region, &Q_x, &sig.r, offset)?;
+        // // 6. check if Q.x == r (mod n)
+        // let Q_x = Q.x.clone();
+        // scalar_chip.assert_equal(region, &Q_x, &sig.r, offset)?;
 
         Ok(())
     }
@@ -130,7 +129,7 @@ impl<E: CurveAffine, C: CurveAffine> EcdsaChip<E, C> {
 mod tests {
     use crate::circuit::ecc::EccInstruction;
     use crate::circuit::ecdsa::{
-        AssignedEcdsaSig, AssignedPoint, AssignedPublicKey, EccConfig, EccChip, EcdsaChip, EcdsaConfig, EcdsaSig, IntegerChip, IntegerInstructions, Point,
+        AssignedEcdsaSig, AssignedPoint, AssignedPublicKey, EccChip, EccConfig, EcdsaChip, EcdsaConfig, EcdsaSig, IntegerChip, IntegerInstructions, Point,
     };
     use crate::circuit::main_gate::MainGate;
     use crate::circuit::range::RangeChip;
@@ -168,12 +167,11 @@ mod tests {
 
         fn configure(meta: &mut ConstraintSystem<C::ScalarExt>) -> Self::Config {
             // TODO: is this correct?
-            let overflow_bit_lengths = vec![2, 3];
+            let overflow_bit_lengths = vec![2];
 
             let main_gate_config = MainGate::<C::ScalarExt>::configure(meta);
-            let range_config = RangeChip::<C::ScalarExt>::configure(meta, &main_gate_config, overflow_bit_lengths);
+            let range_config = RangeChip::<C::ScalarExt>::configure(meta, &main_gate_config, overflow_bit_lengths.clone());
             let scalar_config = IntegerChip::<E::ScalarExt, C::ScalarExt>::configure(meta, &range_config, &main_gate_config);
-
             let ecc_scalar_config = IntegerChip::<E::Base, C::ScalarExt>::configure(meta, &range_config, &main_gate_config);
             let ecc_chip_config = EccConfig {
                 integer_chip_config: ecc_scalar_config.clone(),
@@ -184,7 +182,8 @@ mod tests {
         }
 
         fn synthesize(&self, config: Self::Config, mut layouter: impl Layouter<<C as CurveAffine>::ScalarExt>) -> Result<(), Error> {
-            let ecc_base_chip = IntegerChip::<E::Base, C::ScalarExt>::new(config.ecdsa_verify_config.ecc_chip_config.integer_chip_config.clone(), self.rns_base.clone());
+            let ecc_base_chip =
+                IntegerChip::<E::Base, C::ScalarExt>::new(config.ecdsa_verify_config.ecc_chip_config.integer_chip_config.clone(), self.rns_base.clone());
             let ecc_chip = EccChip::<E, C> {
                 config: config.ecdsa_verify_config.ecc_chip_config.clone(),
                 e_base_field: ecc_base_chip,
@@ -192,6 +191,21 @@ mod tests {
             let scalar_chip = IntegerChip::<E::ScalarExt, C::ScalarExt>::new(config.ecdsa_verify_config.scalar_config.clone(), self.rns_scalar.clone());
 
             let ecdsa_chip = EcdsaChip::<E, C>::new(config.ecdsa_verify_config.clone(), ecc_chip, scalar_chip);
+
+            let range_chip = scalar_chip.new(config.ecdsa_verify_config.scalar_config.range_config.clone(), self.rns_scalar.bit_len_lookup);
+            #[cfg(not(feature = "no_lookup"))]
+            range_chip.load_limb_range_table(&mut layouter)?;
+            #[cfg(not(feature = "no_lookup"))]
+            range_chip.load_overflow_range_tables(&mut layouter)?;
+
+            let ecc_range_chip = ecc_base_chip.new(
+                config.ecdsa_verify_config.ecc_scalar_config.range_config.clone(),
+                self.rns_scalar.bit_len_lookup,
+            );
+            #[cfg(not(feature = "no_lookup"))]
+            ecc_range_chip.load_limb_range_table(&mut layouter)?;
+            #[cfg(not(feature = "no_lookup"))]
+            ecc_range_chip.load_overflow_range_tables(&mut layouter)?;
 
             layouter.assign_region(
                 || "region 0",
@@ -206,9 +220,11 @@ mod tests {
                         s: s_assigned.clone(),
                     };
 
+                    // println!("assigned r = {:?}", r_assigned);
+
                     // TODO: should not do this, instead we should use `assign_point`
-                    let x_assigned = ecdsa_chip.scalar_chip.assign_integer(&mut region, Some(self.pk.x.clone()), offset)?;
-                    let y_assigned = ecdsa_chip.scalar_chip.assign_integer(&mut region, Some(self.pk.y.clone()), offset)?;
+                    let x_assigned = ecdsa_chip.ecc_chip.e_base_field.assign_integer(&mut region, Some(self.pk.x.clone()), offset)?;
+                    let y_assigned = ecdsa_chip.ecc_chip.e_base_field.assign_integer(&mut region, Some(self.pk.y.clone()), offset)?;
                     let pk = AssignedPublicKey {
                         point: AssignedPoint {
                             x: x_assigned.clone(),
@@ -232,8 +248,9 @@ mod tests {
         // assuming that we are verifing signature (in Fp curve) on Fq curve
         // which means signature's scalar field is Fq, base field is Fp
         // which in turn means E::ScalarExt == C::Base, E::Base == C::ScalarExt
-        use halo2::pasta::EqAffine as E;
+        // p > q
         use halo2::pasta::EpAffine as C;
+        use halo2::pasta::EqAffine as E;
 
         let bit_len_limb = 64;
         let rns_base = Rns::<<E as CurveAffine>::Base, <C as CurveAffine>::ScalarExt>::construct(bit_len_limb);
@@ -244,13 +261,21 @@ mod tests {
         #[cfg(feature = "no_lookup")]
         let k: u32 = 8;
 
-        let integer_r = rns_scalar.rand_prenormalized();
-        let integer_s = rns_scalar.rand_prenormalized();
+        let integer_r = rns_scalar.rand_normalized();
+        let integer_s = rns_scalar.rand_normalized();
 
-        let integer_x = rns_base.rand_prenormalized();
-        let integer_y = rns_base.rand_prenormalized();
+        println!("integer_r = {:?}", integer_r);
+        println!("integer_s = {:?}", integer_s);
 
-        let integer_m_hash = rns_scalar.rand_prenormalized();
+        let integer_x = rns_base.rand_normalized();
+        let integer_y = rns_base.rand_normalized();
+
+        println!("integer_x = {:?}", integer_x);
+        println!("integer_y = {:?}", integer_y);
+
+        let integer_m_hash = rns_scalar.rand_normalized();
+
+        println!("integer_m_hash = {:?}", integer_m_hash);
 
         let sig = EcdsaSig {
             r: integer_r.clone(),
@@ -260,7 +285,13 @@ mod tests {
         let msg_hash = Some(integer_m_hash.clone());
 
         // testcase: normal
-        let circuit = TestCircuitEcdsaVerify::<E, C> { sig, pk, msg_hash, rns_base, rns_scalar };
+        let circuit = TestCircuitEcdsaVerify::<E, C> {
+            sig,
+            pk,
+            msg_hash,
+            rns_base,
+            rns_scalar,
+        };
 
         let prover = match MockProver::run(k, &circuit, vec![]) {
             Ok(prover) => prover,
