@@ -28,7 +28,8 @@ pub struct IntegerConfig {
 
 pub struct IntegerChip<Wrong: FieldExt, Native: FieldExt> {
     config: IntegerConfig,
-    rns: Rns<Wrong, Native>,
+    // TODO: is `pub` necessary?
+    pub rns: Rns<Wrong, Native>,
 }
 
 pub trait IntegerInstructions<N: FieldExt> {
