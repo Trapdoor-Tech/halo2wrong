@@ -196,7 +196,7 @@ impl<W: FieldExt, N: FieldExt> IntegerChip<W, N> {
         }
     }
 
-    fn range_chip(&self) -> RangeChip<N> {
+    pub fn range_chip(&self) -> RangeChip<N> {
         let bit_len_lookup = self.rns.bit_len_limb / NUMBER_OF_LOOKUP_LIMBS;
         RangeChip::<N>::new(self.config.range_config.clone(), bit_len_lookup)
     }
