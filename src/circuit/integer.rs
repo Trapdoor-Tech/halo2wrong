@@ -22,8 +22,9 @@ mod div;
 
 #[derive(Clone, Debug)]
 pub struct IntegerConfig {
-    range_config: RangeConfig,
-    main_gate_config: MainGateConfig,
+    // TODO: is `pub` necessary?
+    pub range_config: RangeConfig,
+    pub main_gate_config: MainGateConfig,
 }
 
 pub struct IntegerChip<Wrong: FieldExt, Native: FieldExt> {

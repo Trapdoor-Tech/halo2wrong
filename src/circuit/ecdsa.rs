@@ -98,19 +98,19 @@ impl<E: CurveAffine, C: CurveAffine> EcdsaChip<E, C> {
         // 1. check 0 < r, s < n
 
         // // since `assert_not_zero` already includes a in-field check, we can just call `assert_not_zero`
-        scalar_chip.assert_in_field(region, &sig.r, offset)?;
+        // scalar_chip.assert_in_field(region, &sig.r, offset)?;
         // scalar_chip.assert_in_field(region, &sig.s, offset)?;
-        // scalar_chip.assert_not_zero(region, &sig.r, offset)?;
-        // scalar_chip.assert_not_zero(region, &sig.s, offset)?;
+        scalar_chip.assert_not_zero(region, &sig.r, offset)?;
+        scalar_chip.assert_not_zero(region, &sig.s, offset)?;
 
         // 2. w = s^(-1) (mod n)
-        // let (s_inv, _) = scalar_chip.invert(region, &sig.s, offset)?;
+        let (s_inv, _) = scalar_chip.invert(region, &sig.s, offset)?;
 
-        // // 3. u1 = m' * w (mod n)
-        // let u1 = scalar_chip.mul(region, &msg_hash, &s_inv, offset)?;
+        // 3. u1 = m' * w (mod n)
+        let u1 = scalar_chip.mul(region, &msg_hash, &s_inv, offset)?;
 
-        // // 4. u2 = r * w (mod n)
-        // let u2 = scalar_chip.mul(region, &sig.r, &s_inv, offset)?;
+        // 4. u2 = r * w (mod n)
+        let u2 = scalar_chip.mul(region, &sig.r, &s_inv, offset)?;
 
         // // 5. compute Q = u1*G + u2*pk
         // let g1 = self.ecc_chip.mul_fix(region, E::generator(), u1, offset)?;
@@ -133,6 +133,7 @@ mod tests {
     };
     use crate::circuit::main_gate::MainGate;
     use crate::circuit::range::RangeChip;
+    use crate::circuit::range::RangeInstructions;
     use crate::rns::{Integer, Rns};
     use halo2::arithmetic::{CurveAffine, FieldExt};
     use halo2::circuit::{Chip, Layouter, Region, SimpleFloorPlanner};
@@ -167,7 +168,7 @@ mod tests {
 
         fn configure(meta: &mut ConstraintSystem<C::ScalarExt>) -> Self::Config {
             // TODO: is this correct?
-            let overflow_bit_lengths = vec![2];
+            let overflow_bit_lengths = vec![2, 3];
 
             let main_gate_config = MainGate::<C::ScalarExt>::configure(meta);
             let range_config = RangeChip::<C::ScalarExt>::configure(meta, &main_gate_config, overflow_bit_lengths.clone());
@@ -191,21 +192,6 @@ mod tests {
             let scalar_chip = IntegerChip::<E::ScalarExt, C::ScalarExt>::new(config.ecdsa_verify_config.scalar_config.clone(), self.rns_scalar.clone());
 
             let ecdsa_chip = EcdsaChip::<E, C>::new(config.ecdsa_verify_config.clone(), ecc_chip, scalar_chip);
-
-            let range_chip = scalar_chip.new(config.ecdsa_verify_config.scalar_config.range_config.clone(), self.rns_scalar.bit_len_lookup);
-            #[cfg(not(feature = "no_lookup"))]
-            range_chip.load_limb_range_table(&mut layouter)?;
-            #[cfg(not(feature = "no_lookup"))]
-            range_chip.load_overflow_range_tables(&mut layouter)?;
-
-            let ecc_range_chip = ecc_base_chip.new(
-                config.ecdsa_verify_config.ecc_scalar_config.range_config.clone(),
-                self.rns_scalar.bit_len_lookup,
-            );
-            #[cfg(not(feature = "no_lookup"))]
-            ecc_range_chip.load_limb_range_table(&mut layouter)?;
-            #[cfg(not(feature = "no_lookup"))]
-            ecc_range_chip.load_overflow_range_tables(&mut layouter)?;
 
             layouter.assign_region(
                 || "region 0",
@@ -237,6 +223,13 @@ mod tests {
                     ecdsa_chip.verify(&mut region, &sig, &pk, &msg_hash, offset)
                 },
             )?;
+
+            // since we used `assert_in_field`, we need a range chip
+            let range_chip = RangeChip::<C::ScalarExt>::new(config.ecdsa_verify_config.scalar_config.range_config.clone(), self.rns_scalar.bit_len_lookup);
+            #[cfg(not(feature = "no_lookup"))]
+            range_chip.load_limb_range_table(&mut layouter)?;
+            #[cfg(not(feature = "no_lookup"))]
+            range_chip.load_overflow_range_tables(&mut layouter)?;
 
             Ok(())
         }
