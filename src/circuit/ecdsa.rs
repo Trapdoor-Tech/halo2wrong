@@ -127,6 +127,7 @@ impl<E: CurveAffine, C: CurveAffine> EcdsaChip<E, C> {
 
 #[cfg(test)]
 mod tests {
+    use crate::NUMBER_OF_LIMBS;
     use crate::circuit::ecc::EccInstruction;
     use crate::circuit::ecdsa::{
         AssignedEcdsaSig, AssignedPoint, AssignedPublicKey, EccChip, EccConfig, EcdsaChip, EcdsaConfig, EcdsaSig, IntegerChip, IntegerInstructions, Point,
@@ -134,11 +135,12 @@ mod tests {
     use crate::circuit::main_gate::MainGate;
     use crate::circuit::range::RangeChip;
     use crate::circuit::range::RangeInstructions;
-    use crate::rns::{Integer, Rns};
-    use halo2::arithmetic::{CurveAffine, FieldExt};
+    use crate::rns::{Integer, Rns, fe_to_big};
+    use halo2::arithmetic::{CurveAffine, FieldExt, Field};
     use halo2::circuit::{Chip, Layouter, Region, SimpleFloorPlanner};
     use halo2::dev::MockProver;
     use halo2::plonk::{Circuit, ConstraintSystem, Error};
+    use group::{Curve, prime::PrimeCurveAffine};
 
     #[derive(Clone, Debug)]
     struct TestCircuitEcdsaVerifyConfig {
@@ -254,27 +256,28 @@ mod tests {
         #[cfg(feature = "no_lookup")]
         let k: u32 = 8;
 
-        let integer_r = rns_scalar.rand_normalized();
-        let integer_s = rns_scalar.rand_normalized();
+        let generator = <E as PrimeCurveAffine>::generator();
+        let sk = <E as CurveAffine>::ScalarExt::rand();
+        let pk = generator * sk;
+        let pk = pk.to_affine();
 
-        println!("integer_r = {:?}", integer_r);
-        println!("integer_s = {:?}", integer_s);
+        let m_hash = <E as CurveAffine>::ScalarExt::rand();
+        let randomness = <E as CurveAffine>::ScalarExt::rand();
+        let randomness_inv = randomness.invert().unwrap();
+        let sig_point = generator * randomness;
+        let x = sig_point.to_affine().coordinates().unwrap().x().clone();
+        let x_bytes = x.to_bytes();
+        let x_bytes_on_n = <E as CurveAffine>::ScalarExt::from_bytes(&x_bytes).unwrap(); // get x cordinate (E::Base) on E::Scalar
+        let integer_r = rns_scalar.new_from_big(fe_to_big(x_bytes_on_n));
+        let integer_s = rns_scalar.new_from_big(fe_to_big(randomness_inv * (m_hash + x_bytes_on_n * sk)));
 
-        let integer_x = rns_base.rand_normalized();
-        let integer_y = rns_base.rand_normalized();
-
-        println!("integer_x = {:?}", integer_x);
-        println!("integer_y = {:?}", integer_y);
-
-        let integer_m_hash = rns_scalar.rand_normalized();
-
-        println!("integer_m_hash = {:?}", integer_m_hash);
+        let integer_m_hash = rns_scalar.new_from_big(fe_to_big(m_hash));
 
         let sig = EcdsaSig {
             r: integer_r.clone(),
             s: integer_s.clone(),
         };
-        let pk = Point { x: integer_x, y: integer_y };
+        let pk = Point::new_from_point(pk, NUMBER_OF_LIMBS, bit_len_limb);
         let msg_hash = Some(integer_m_hash.clone());
 
         // testcase: normal
