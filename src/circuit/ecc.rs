@@ -125,7 +125,29 @@ impl<E: CurveAffine, C: CurveAffine> EccInstruction<E, C> for EccChip<E, C> {
     }
 
     fn add(&self, region: &mut Region<'_, C::ScalarExt>, p0: AssignedPoint<C>, p1: AssignedPoint<C>, offset: &mut usize) -> Result<AssignedPoint<C>, Error> {
-        Ok(p0)
+        let to_base = |x: Integer<C::ScalarExt>| -> E::Base {
+            let bytes_le = x.value().to_bytes_le();
+            let mut u256 = [0u8; 32];
+            u256[..bytes_le.len()].copy_from_slice(&bytes_le);
+            E::Base::from_bytes(&u256).unwrap()
+        };
+        let to_scalar = |x: Integer<C::ScalarExt>| -> E::Scalar {
+            let bytes_le = x.value().to_bytes_le();
+            let mut u256 = [0u8; 32];
+            u256[..bytes_le.len()].copy_from_slice(&bytes_le);
+            E::Scalar::from_bytes(&u256).unwrap()
+        };
+        let p0_x = p0.x.integer().map(to_base);
+        let p0_y = p0.y.integer().map(to_base);
+        let p1_x = p1.x.integer().map(to_base);
+        let p1_y = p1.y.integer().map(to_base);
+        let sum = p0_x.map(|p0_x| {
+            let p0 = E::from_xy(p0_x, p0_y.unwrap()).unwrap();
+            let p1 = E::from_xy(p1_x.unwrap(), p1_y.unwrap()).unwrap();
+            let sum = p0.add(p1).to_affine();
+            Point::new_from_point(sum, NUMBER_OF_LIMBS, self.e_base_field.rns.bit_len_limb)
+        });
+        self.assign_point(region, sum, offset)
     }
 
     fn double(&self, region: &mut Region<'_, C::ScalarExt>, p: AssignedPoint<C>, offset: &mut usize) -> Result<AssignedPoint<C>, Error> {

@@ -112,14 +112,14 @@ impl<E: CurveAffine, C: CurveAffine> EcdsaChip<E, C> {
         // 4. u2 = r * w (mod n)
         let u2 = scalar_chip.mul(region, &sig.r, &s_inv, offset)?;
 
-        // // 5. compute Q = u1*G + u2*pk
-        // let g1 = self.ecc_chip.mul_fix(region, E::generator(), u1, offset)?;
-        // let g2 = self.ecc_chip.mul_var(region, pk.point.clone(), u2, offset)?;
-        // let Q = self.ecc_chip.add(region, g1, g2, offset)?;
+        // 5. compute Q = u1*G + u2*pk
+        let g1 = self.ecc_chip.mul_fix(region, E::generator(), u1, offset)?;
+        let g2 = self.ecc_chip.mul_var(region, pk.point.clone(), u2, offset)?;
+        let Q = self.ecc_chip.add(region, g1, g2, offset)?;
 
-        // // 6. check if Q.x == r (mod n)
-        // let Q_x = Q.x.clone();
-        // scalar_chip.assert_equal(region, &Q_x, &sig.r, offset)?;
+        // 6. check if Q.x == r (mod n)
+        let Q_x = Q.x.clone();
+        scalar_chip.assert_equal(region, &Q_x, &sig.r, offset)?;
 
         Ok(())
     }
@@ -240,7 +240,7 @@ mod tests {
     // This test module is not finished yet
     #[test]
     fn test_pasta_ecdsa_verifier() {
-        // assuming that we are verifing signature (in Fp curve) on Fq curve
+        // assuming that we are verifying signature (in Fp curve) on Fq curve
         // which means signature's scalar field is Fq, base field is Fp
         // which in turn means E::ScalarExt == C::Base, E::Base == C::ScalarExt
         // p > q
