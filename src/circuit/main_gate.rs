@@ -664,20 +664,7 @@ impl<F: FieldExt> MainGateInstructions<F> for MainGate<F> {
     }
 
     fn assert_zero(&self, region: &mut Region<'_, F>, a: impl Assigned<F>, offset: &mut usize) -> Result<(), Error> {
-        let (one, zero) = (F::one(), F::zero());
-
-        self.combine(
-            region,
-            Term::Assigned(&a, one),
-            Term::Zero,
-            Term::Zero,
-            Term::Zero,
-            zero,
-            offset,
-            CombinationOption::SingleLinerAdd,
-        )?;
-
-        Ok(())
+        self.assert_equal_to_constant(region, a, F::zero(), offset)
     }
 
     fn assert_not_zero(&self, region: &mut Region<'_, F>, a: impl Assigned<F>, offset: &mut usize) -> Result<(), Error> {
