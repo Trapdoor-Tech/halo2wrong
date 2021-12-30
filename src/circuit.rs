@@ -7,9 +7,9 @@ use halo2::{
 use num_bigint::BigUint as big_uint;
 use std::marker::PhantomData;
 
-mod ecc;
+pub mod ecc;
 mod integer;
-mod main_gate;
+pub mod main_gate;
 mod range;
 
 pub trait Assigned<F: FieldExt> {
@@ -195,8 +195,17 @@ impl<F: FieldExt> Assigned<F> for AssignedValue<F> {
     }
 }
 
+impl<F: FieldExt> Assigned<F> for &AssignedValue<F> {
+    fn value(&self) -> Option<F> {
+        self.value.clone()
+    }
+    fn cell(&self) -> Cell {
+        self.cell
+    }
+}
+
 impl<F: FieldExt> AssignedValue<F> {
-    fn new(cell: Cell, value: Option<F>) -> Self {
+    pub fn new(cell: Cell, value: Option<F>) -> Self {
         AssignedValue { value, cell }
     }
 

@@ -106,6 +106,14 @@ pub trait MainGateInstructions<F: FieldExt> {
         offset: &mut usize,
     ) -> Result<AssignedValue<F>, Error>;
 
+    fn assign_constant(
+        &self,
+        region: &mut Region<'_, F>,
+        value: &UnassignedValue<F>,
+        column: MainGateColumn,
+        offset: &mut usize,
+    ) -> Result<AssignedValue<F>, Error>;
+
     fn assign_bit(&self, region: &mut Region<'_, F>, value: Option<F>, offset: &mut usize) -> Result<AssignedBit<F>, Error>;
 
     fn assert_bit(&self, region: &mut Region<'_, F>, a: impl Assigned<F>, offset: &mut usize) -> Result<(), Error>;
@@ -162,6 +170,7 @@ pub trait MainGateInstructions<F: FieldExt> {
 
     fn assert_equal_to_constant(&self, region: &mut Region<'_, F>, a: impl Assigned<F>, b: F, offset: &mut usize) -> Result<(), Error>;
 
+    fn neg(&self, region: &mut Region<'_, F>, a: impl Assigned<F>, offset: &mut usize) -> Result<AssignedValue<F>, Error>;
     fn assert_equal(&self, region: &mut Region<'_, F>, a: impl Assigned<F>, b: impl Assigned<F>, offset: &mut usize) -> Result<(), Error>;
     fn assert_not_equal(&self, region: &mut Region<'_, F>, a: impl Assigned<F>, b: impl Assigned<F>, offset: &mut usize) -> Result<(), Error>;
     fn is_equal(&self, region: &mut Region<'_, F>, a: impl Assigned<F>, b: impl Assigned<F>, offset: &mut usize) -> Result<AssignedCondition<F>, Error>;
@@ -198,6 +207,7 @@ pub trait MainGateInstructions<F: FieldExt> {
     fn mul2(&self, region: &mut Region<'_, F>, a: impl Assigned<F>, offset: &mut usize) -> Result<AssignedValue<F>, Error>;
     fn mul3(&self, region: &mut Region<'_, F>, a: impl Assigned<F>, offset: &mut usize) -> Result<AssignedValue<F>, Error>;
 
+    fn mul_by_constant(&self, region: &mut Region<'_, F>, a: impl Assigned<F>, b: F, offset: &mut usize) -> Result<AssignedValue<F>, Error>;
     fn mul(&self, region: &mut Region<'_, F>, a: impl Assigned<F>, b: impl Assigned<F>, offset: &mut usize) -> Result<AssignedValue<F>, Error>;
 
     fn no_operation(&self, region: &mut Region<'_, F>, offset: &mut usize) -> Result<(), Error>;
@@ -216,6 +226,28 @@ pub trait MainGateInstructions<F: FieldExt> {
 }
 
 impl<F: FieldExt> MainGateInstructions<F> for MainGate<F> {
+    fn neg(&self, region: &mut Region<'_, F>, a: impl Assigned<F>, offset: &mut usize) -> Result<AssignedValue<F>, Error> {
+        let b = match a.value() {
+            Some(a) => Some(a.neg()),
+            _ => None,
+        };
+
+        let one = F::one();
+
+        let (_, _, cell, _) = self.combine(
+            region,
+            Term::Assigned(&a, one),
+            Term::Unassigned(b, -one),
+            Term::Zero,
+            Term::Zero,
+            F::zero(),
+            offset,
+            CombinationOption::SingleLinerAdd,
+        )?;
+
+        Ok(AssignedValue::new(cell, b))
+
+    }
     fn add(&self, region: &mut Region<'_, F>, a: impl Assigned<F>, b: impl Assigned<F>, offset: &mut usize) -> Result<AssignedValue<F>, Error> {
         self.add_with_constant(region, a, b, F::zero(), offset)
     }
@@ -359,6 +391,29 @@ impl<F: FieldExt> MainGateInstructions<F> for MainGate<F> {
             Term::assigned_to_add(&a),
             Term::unassigned_to_sub(c),
             F::zero(),
+            offset,
+            CombinationOption::SingleLinerAdd,
+        )?;
+
+        Ok(AssignedValue::new(cell, c))
+    }
+
+    fn mul_by_constant(&self, region: &mut Region<'_, F>, a: impl Assigned<F>, b: F, offset: &mut usize) -> Result<AssignedValue<F>, Error> {
+        let c = match a.value() {
+            Some(a) => Some(a*b),
+            _ => None,
+        };
+
+        let one = F::one();
+        let zero = F::zero();
+
+        let (_, _, cell, _) = self.combine(
+            region,
+            Term::Assigned(&a, b),
+            Term::Zero,
+            Term::Unassigned(c, -one),
+            Term::Zero,
+            zero,
             offset,
             CombinationOption::SingleLinerAdd,
         )?;
@@ -609,7 +664,20 @@ impl<F: FieldExt> MainGateInstructions<F> for MainGate<F> {
     }
 
     fn assert_zero(&self, region: &mut Region<'_, F>, a: impl Assigned<F>, offset: &mut usize) -> Result<(), Error> {
-        self.assert_equal_to_constant(region, a, F::zero(), offset)
+        let (one, zero) = (F::one(), F::zero());
+
+        self.combine(
+            region,
+            Term::Assigned(&a, one),
+            Term::Zero,
+            Term::Zero,
+            Term::Zero,
+            zero,
+            offset,
+            CombinationOption::SingleLinerAdd,
+        )?;
+
+        Ok(())
     }
 
     fn assert_not_zero(&self, region: &mut Region<'_, F>, a: impl Assigned<F>, offset: &mut usize) -> Result<(), Error> {
@@ -934,7 +1002,6 @@ impl<F: FieldExt> MainGateInstructions<F> for MainGate<F> {
 
         Ok(())
     }
-
     fn combine(
         &self,
         region: &mut Region<'_, F>,
@@ -1026,6 +1093,36 @@ impl<F: FieldExt> MainGateInstructions<F> for MainGate<F> {
         region.assign_fixed(|| "s_constant", self.config.s_constant, *offset, || Ok(F::zero()))?;
         *offset = *offset + 1;
         Ok(())
+    }
+
+    fn assign_constant(
+        &self,
+        region: &mut Region<'_, F>,
+        unassigned: &UnassignedValue<F>,
+        column: MainGateColumn,
+        offset: &mut usize
+    ) -> Result<AssignedValue<F>, Error> {
+        let mut coeffs = vec![F::zero(), F::zero(), F::zero(), F::zero()];
+        let mut neg_one = F::one();
+        neg_one.neg();
+        let (idx, column) = match column {
+            MainGateColumn::A => (0, self.config.a),
+            MainGateColumn::B => (1, self.config.b),
+            MainGateColumn::C => (2, self.config.c),
+            MainGateColumn::D => (3, self.config.d),
+        };
+        coeffs[idx] = neg_one;
+        let cell = region.assign_advice(|| "assign value", column, *offset, || unassigned.value())?;
+        region.assign_fixed(|| "s_mul", self.config.s_mul, *offset, || Ok(F::zero()))?;
+        region.assign_fixed(|| "sa", self.config.sa, *offset, || Ok(coeffs[0]))?;
+        region.assign_fixed(|| "sb", self.config.sb, *offset, || Ok(coeffs[1]))?;
+        region.assign_fixed(|| "sc", self.config.sc, *offset, || Ok(coeffs[2]))?;
+        region.assign_fixed(|| "sd", self.config.sd, *offset, || Ok(coeffs[3]))?;
+        region.assign_fixed(|| "sd_next", self.config.sd_next, *offset, || Ok(F::zero()))?;
+        region.assign_fixed(|| "s_constant", self.config.s_constant, *offset, || unassigned.value())?;
+        *offset = *offset + 1;
+
+        Ok(unassigned.assign(cell))
     }
 }
 

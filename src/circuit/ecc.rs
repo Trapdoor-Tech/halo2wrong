@@ -69,8 +69,8 @@ impl<F: FieldExt> AssignedIncompletePoint<F> {
     }
 }
 
-mod base_field_ecc;
-mod general_ecc;
+pub mod base_field_ecc;
+pub mod general_ecc;
 
 #[derive(Clone, Debug)]
 pub struct EccConfig {

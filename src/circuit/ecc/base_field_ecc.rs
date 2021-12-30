@@ -12,7 +12,7 @@ use super::EccConfig;
 use crate::circuit::ecc::{AssignedPoint, Point};
 
 pub trait BaseFieldEccInstruction<C: CurveAffine> {
-    fn assign_point(&self, region: &mut Region<'_, C::ScalarExt>, point: C, offset: &mut usize) -> Result<AssignedPoint<C::ScalarExt>, Error>;
+    fn assign_point(&self, region: &mut Region<'_, C::ScalarExt>, point: Option<C>, offset: &mut usize) -> Result<AssignedPoint<C::ScalarExt>, Error>;
 
     fn assert_is_on_curve(&self, region: &mut Region<'_, C::ScalarExt>, point: AssignedPoint<C::ScalarExt>, offset: &mut usize) -> Result<(), Error>;
 
@@ -101,7 +101,7 @@ impl<C: CurveAffine> BaseFieldEccChip<C> {
         IntegerChip::<C::Base, C::ScalarExt>::new(integer_chip_config, self.rns.clone())
     }
 
-    fn main_gate(&self) -> MainGate<C::ScalarExt> {
+    pub fn main_gate(&self) -> MainGate<C::ScalarExt> {
         MainGate::<_>::new(self.config.main_gate_config.clone())
     }
 
@@ -135,14 +135,18 @@ impl<C: CurveAffine> BaseFieldEccChip<C> {
 }
 
 impl<C: CurveAffine> BaseFieldEccInstruction<C> for BaseFieldEccChip<C> {
-    fn assign_point(&self, region: &mut Region<'_, C::ScalarExt>, point: C, offset: &mut usize) -> Result<AssignedPoint<C::ScalarExt>, Error> {
+    fn assign_point(&self, region: &mut Region<'_, C::ScalarExt>, point: Option<C>, offset: &mut usize) -> Result<AssignedPoint<C::ScalarExt>, Error> {
         let integer_chip = self.integer_chip();
-        let point = self.into_rns_point(point);
+        let point = point.map(|point| self.into_rns_point(point));
         // FIX: This won't help for a prover assigns the infinity
-        assert!(!point.is_identity);
-        let x = integer_chip.assign_integer(region, Some(point.x), offset)?;
-        let y = integer_chip.assign_integer(region, Some(point.y), offset)?;
-        let z = self.main_gate().assign_bit(region, Some(C::ScalarExt::zero()), offset)?;
+        // assert!(!point.is_identity);
+        point.as_ref().map(|point| assert!(point.is_identity)).unwrap();
+        let px = point.as_ref().map(|point| point.x.clone());
+        let py = point.as_ref().map(|point| point.y.clone());
+        let pz = point.as_ref().map(|_| C::ScalarExt::zero());
+        let x = integer_chip.assign_integer(region, px, offset)?;
+        let y = integer_chip.assign_integer(region, py, offset)?;
+        let z = self.main_gate().assign_bit(region, pz, offset)?;
         Ok(AssignedPoint::new(x, y, z))
     }
 

@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-mod circuit;
+pub mod circuit;
 mod rns;
 
 pub(crate) const NUMBER_OF_LIMBS: usize = 4;
