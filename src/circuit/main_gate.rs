@@ -1005,10 +1005,10 @@ impl<F: FieldExt> MainGateInstructions<F> for MainGate<F> {
         let (c_2, u_2) = (term_2.coeff(), term_2.base());
         let (c_3, u_3) = (term_3.coeff(), term_3.base());
 
-        let cell_0 = region.assign_advice(|| "coeff_0", self.config.a, *offset, || Ok(c_0.ok_or(Error::SynthesisError)?))?;
-        let cell_1 = region.assign_advice(|| "coeff_1", self.config.b, *offset, || Ok(c_1.ok_or(Error::SynthesisError)?))?;
-        let cell_2 = region.assign_advice(|| "coeff_2", self.config.c, *offset, || Ok(c_2.ok_or(Error::SynthesisError)?))?;
-        let cell_3 = region.assign_advice(|| "coeff_3", self.config.d, *offset, || Ok(c_3.ok_or(Error::SynthesisError)?))?;
+        let cell_0 = region.assign_advice(|| "coeff_0", self.config.a, *offset, || Ok(c_0.ok_or(Error::Synthesis)?))?;
+        let cell_1 = region.assign_advice(|| "coeff_1", self.config.b, *offset, || Ok(c_1.ok_or(Error::Synthesis)?))?;
+        let cell_2 = region.assign_advice(|| "coeff_2", self.config.c, *offset, || Ok(c_2.ok_or(Error::Synthesis)?))?;
+        let cell_3 = region.assign_advice(|| "coeff_3", self.config.d, *offset, || Ok(c_3.ok_or(Error::Synthesis)?))?;
 
         region.assign_fixed(|| "base_0", self.config.sa, *offset, || Ok(u_0))?;
         region.assign_fixed(|| "base_1", self.config.sb, *offset, || Ok(u_1))?;
