@@ -159,7 +159,7 @@ impl<F: FieldExt> AssignedInteger<F> {
     }
 
     pub fn limb_value(&self, idx: usize) -> Result<F, Error> {
-        Ok(self.limbs[idx].value.as_ref().ok_or(Error::SynthesisError)?.fe())
+        Ok(self.limbs[idx].value.as_ref().ok_or(Error::Synthesis)?.fe())
     }
 
     pub fn limb(&self, idx: usize) -> AssignedLimb<F> {
@@ -233,7 +233,7 @@ impl<F: FieldExt> UnassignedValue<F> {
     }
 
     pub fn value(&self) -> Result<F, Error> {
-        Ok(self.value.clone().ok_or(Error::SynthesisError)?)
+        Ok(self.value.clone().ok_or(Error::Synthesis)?)
     }
 
     pub fn decompose(&self, number_of_limbs: usize, bit_len: usize) -> Option<Vec<F>> {

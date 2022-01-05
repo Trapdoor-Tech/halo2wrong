@@ -3,11 +3,11 @@ use crate::circuit::main_gate::MainGateInstructions;
 use crate::circuit::{AssignedInteger, AssignedLimb};
 use crate::rns::Common;
 use crate::NUMBER_OF_LIMBS;
-use halo2::arithmetic::FieldExt;
+use halo2::arithmetic::{FieldExt, BaseExt};
 use halo2::circuit::Region;
 use halo2::plonk::Error;
 
-impl<W: FieldExt, N: FieldExt> IntegerChip<W, N> {
+impl<W: BaseExt, N: FieldExt> IntegerChip<W, N> {
     pub(super) fn _sub(
         &self,
         region: &mut Region<'_, N>,

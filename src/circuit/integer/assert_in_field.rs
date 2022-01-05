@@ -1,11 +1,11 @@
 use super::{IntegerChip, IntegerInstructions, Range};
 use crate::circuit::main_gate::{CombinationOption, MainGateInstructions, Term};
 use crate::circuit::{AssignedInteger, AssignedValue};
-use halo2::arithmetic::FieldExt;
+use halo2::arithmetic::{FieldExt, BaseExt};
 use halo2::circuit::Region;
 use halo2::plonk::Error;
 
-impl<W: FieldExt, N: FieldExt> IntegerChip<W, N> {
+impl<W: BaseExt, N: FieldExt> IntegerChip<W, N> {
     pub(super) fn _assert_in_field(&self, region: &mut Region<'_, N>, input: &AssignedInteger<N>, offset: &mut usize) -> Result<(), Error> {
         // Constraints:
         // 0 = -c_0 + p_0 - a_0 + b_0 * R

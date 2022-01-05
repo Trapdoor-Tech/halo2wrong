@@ -5,7 +5,7 @@ use crate::circuit::range::{RangeChip, RangeConfig};
 use crate::circuit::AssignedLimb;
 use crate::rns::{Common, Integer, Rns};
 use crate::{NUMBER_OF_LIMBS, NUMBER_OF_LOOKUP_LIMBS};
-use halo2::arithmetic::FieldExt;
+use halo2::arithmetic::{FieldExt, BaseExt};
 use halo2::circuit::Region;
 use halo2::plonk::Error;
 
@@ -43,12 +43,12 @@ impl IntegerConfig {
     }
 }
 
-pub struct IntegerChip<Wrong: FieldExt, Native: FieldExt> {
+pub struct IntegerChip<Wrong: BaseExt, Native: FieldExt> {
     config: IntegerConfig,
     pub rns: Rns<Wrong, Native>,
 }
 
-impl<W: FieldExt, N: FieldExt> IntegerChip<W, N> {
+impl<W: BaseExt, N: FieldExt> IntegerChip<W, N> {
     pub(crate) fn new_assigned_integer(&self, limbs: Vec<AssignedLimb<N>>, native_value: AssignedValue<N>) -> AssignedInteger<N> {
         AssignedInteger::new(limbs, native_value, self.rns.bit_len_limb)
     }
@@ -126,7 +126,7 @@ pub trait IntegerInstructions<N: FieldExt> {
     ) -> Result<AssignedInteger<N>, Error>;
 }
 
-impl<W: FieldExt, N: FieldExt> IntegerInstructions<N> for IntegerChip<W, N> {
+impl<W: BaseExt, N: FieldExt> IntegerInstructions<N> for IntegerChip<W, N> {
     fn add(&self, region: &mut Region<'_, N>, a: &AssignedInteger<N>, b: &AssignedInteger<N>, offset: &mut usize) -> Result<AssignedInteger<N>, Error> {
         let (a, b) = (
             &self.reduce_if_limb_values_exceeds_unreduced(region, a, offset)?,
@@ -372,7 +372,7 @@ impl<W: FieldExt, N: FieldExt> IntegerInstructions<N> for IntegerChip<W, N> {
     }
 }
 
-impl<W: FieldExt, N: FieldExt> IntegerChip<W, N> {
+impl<W: BaseExt, N: FieldExt> IntegerChip<W, N> {
     pub fn new(config: IntegerConfig, rns: Rns<W, N>) -> Self {
         IntegerChip { config, rns }
     }

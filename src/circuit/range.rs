@@ -43,7 +43,7 @@ impl<F: FieldExt> RangeChip<F> {
             .fine_tune_tables
             .iter()
             .find(|&table_config| table_config.bit_len == bit_len)
-            .ok_or(Error::SynthesisError)?;
+            .ok_or(Error::Synthesis)?;
         Ok(table_config)
     }
 
@@ -223,7 +223,7 @@ impl<F: FieldExt> RangeInstructions<F> for RangeChip<F> {
 
     #[cfg(not(feature = "no_lookup"))]
     fn load_limb_range_table(&self, layouter: &mut impl Layouter<F>) -> Result<(), Error> {
-        let table_values: Vec<F> = (0..1 << self.base_bit_len).map(|e| F::from_u64(e)).collect();
+        let table_values: Vec<F> = (0..1 << self.base_bit_len).map(|e| F::from_u128(e)).collect();
 
         layouter.assign_table(
             || "",
@@ -241,7 +241,7 @@ impl<F: FieldExt> RangeInstructions<F> for RangeChip<F> {
     fn load_overflow_range_tables(&self, layouter: &mut impl Layouter<F>) -> Result<(), Error> {
         for overflow_table in self.config.fine_tune_tables.iter() {
             let bit_len = overflow_table.bit_len;
-            let table_values: Vec<F> = (0..1 << bit_len).map(|e| F::from_u64(e)).collect();
+            let table_values: Vec<F> = (0..1 << bit_len).map(|e| F::from_u128(e)).collect();
 
             layouter.assign_table(
                 || "",
@@ -260,7 +260,7 @@ impl<F: FieldExt> RangeInstructions<F> for RangeChip<F> {
 
 impl<F: FieldExt> RangeChip<F> {
     pub fn new(config: RangeConfig, base_bit_len: usize) -> Self {
-        let two = F::from_u64(2);
+        let two = F::from_u128(2);
         let left_shifter_r = two.pow(&[base_bit_len as u64, 0, 0, 0]);
         let left_shifter_2r = two.pow(&[(base_bit_len * 2) as u64, 0, 0, 0]);
         let left_shifter_3r = two.pow(&[(base_bit_len * 3) as u64, 0, 0, 0]);

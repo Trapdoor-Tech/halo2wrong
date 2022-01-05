@@ -1,11 +1,12 @@
 use crate::{NUMBER_OF_LIMBS, NUMBER_OF_LOOKUP_LIMBS};
-use halo2::arithmetic::FieldExt;
+use halo2::arithmetic::{FieldExt, BaseExt};
 use num_bigint::BigUint as big_uint;
 use num_integer::Integer as _;
 use num_traits::{Num, One, Zero};
 use std::fmt;
 use std::marker::PhantomData;
 use std::ops::Shl;
+use std::io::BufReader;
 
 pub fn decompose_fe<F: FieldExt>(e: F, number_of_limbs: usize, bit_len: usize) -> Vec<F> {
     decompose(fe_to_big(e), number_of_limbs, bit_len)
@@ -46,16 +47,21 @@ pub trait Common<F: FieldExt> {
     }
 }
 
-pub fn fe_to_big<F: FieldExt>(fe: F) -> big_uint {
-    big_uint::from_bytes_le(&fe.to_bytes()[..])
+pub fn fe_to_big<F: BaseExt>(fe: F) -> big_uint {
+    let mut tmp = vec![];
+    fe.write(&mut tmp).unwrap();
+    big_uint::from_bytes_le(&tmp[..])
 }
 
-fn modulus<F: FieldExt>() -> big_uint {
+fn modulus<F: BaseExt>() -> big_uint {
     big_uint::from_str_radix(&F::MODULUS[2..], 16).unwrap()
 }
 
-pub fn big_to_fe<F: FieldExt>(e: big_uint) -> F {
-    F::from_str_vartime(&e.to_str_radix(10)[..]).unwrap()
+pub fn big_to_fe<F: BaseExt>(e: big_uint) -> F {
+    let tmp = e.to_bytes_le();
+    let mut tmp = BufReader::new(&tmp[..]);
+    F::read(&mut tmp).unwrap()
+    //F::from_str_vartime(&e.to_str_radix(10)[..]).unwrap()
 }
 
 impl<N: FieldExt> From<Integer<N>> for big_uint {
@@ -101,7 +107,7 @@ pub(crate) struct ComparisionResult<N: FieldExt> {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct Rns<Wrong: FieldExt, Native: FieldExt> {
+pub struct Rns<Wrong: BaseExt, Native: FieldExt> {
     pub bit_len_limb: usize,
     pub bit_len_lookup: usize,
 
@@ -147,9 +153,9 @@ pub struct Rns<Wrong: FieldExt, Native: FieldExt> {
     _marker_wrong: PhantomData<Wrong>,
 }
 
-impl<W: FieldExt, N: FieldExt> Rns<W, N> {
+impl<W: BaseExt, N: FieldExt> Rns<W, N> {
     fn calculate_base_aux(bit_len_limb: usize) -> Integer<N> {
-        let two = N::from_u64(2);
+        let two = N::from_u128(2);
         let r = &fe_to_big(two.pow(&[bit_len_limb as u64, 0, 0, 0]));
         let wrong_modulus = modulus::<W>();
         let wrong_modulus_decomposed = Integer::<N>::from_big(wrong_modulus.clone(), NUMBER_OF_LIMBS, bit_len_limb);
@@ -187,7 +193,7 @@ impl<W: FieldExt, N: FieldExt> Rns<W, N> {
         assert!(binary_modulus > native_modulus);
         assert!(binary_modulus * native_modulus > wrong_modulus * wrong_modulus);
 
-        let two = N::from_u64(2);
+        let two = N::from_u128(2);
         let two_inv = two.invert().unwrap();
         let right_shifter_r = two_inv.pow(&[bit_len_limb as u64, 0, 0, 0]);
         let right_shifter_2r = two_inv.pow(&[2 * bit_len_limb as u64, 0, 0, 0]);

@@ -69,6 +69,7 @@ pub trait BaseFieldEccInstruction<C: CurveAffine> {
     ) -> Result<AssignedPoint<C::ScalarExt>, Error>;
 }
 
+#[derive(Clone)]
 pub struct BaseFieldEccChip<C: CurveAffine> {
     config: EccConfig,
     rns: Rns<C::Base, C::ScalarExt>,
