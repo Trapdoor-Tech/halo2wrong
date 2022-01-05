@@ -3,11 +3,11 @@ use crate::circuit::main_gate::{CombinationOption, MainGateInstructions, Term};
 use crate::circuit::range::RangeInstructions;
 use crate::circuit::{AssignedInteger, AssignedValue};
 use crate::rns::Quotient;
-use halo2::arithmetic::FieldExt;
+use halo2::arithmetic::{BaseExt, FieldExt};
 use halo2::circuit::Region;
 use halo2::plonk::Error;
 
-impl<W: FieldExt, N: FieldExt> IntegerChip<W, N> {
+impl<W: BaseExt, N: FieldExt> IntegerChip<W, N> {
     pub(super) fn reduce_if_limb_values_exceeds_unreduced(
         &self,
         region: &mut Region<'_, N>,

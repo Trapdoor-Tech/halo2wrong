@@ -5,11 +5,11 @@ use crate::circuit::{AssignedInteger, AssignedValue};
 use crate::rns::{Common, Integer, Quotient};
 use crate::NUMBER_OF_LIMBS;
 
-use halo2::arithmetic::FieldExt;
+use halo2::arithmetic::{FieldExt, BaseExt};
 use halo2::circuit::Region;
 use halo2::plonk::Error;
 
-impl<W: FieldExt, N: FieldExt> IntegerChip<W, N> {
+impl<W: BaseExt, N: FieldExt> IntegerChip<W, N> {
     pub(super) fn mul_v0_range_tune(&self) -> usize {
         self.rns.bit_len_limb + self.rns.mul_v0_overflow
     }

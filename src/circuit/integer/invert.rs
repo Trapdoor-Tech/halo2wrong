@@ -1,11 +1,11 @@
 use super::{AssignedCondition, IntegerChip, IntegerInstructions, MainGateInstructions, Range};
 use crate::circuit::main_gate::{CombinationOption, Term};
 use crate::circuit::{Assigned, AssignedInteger};
-use halo2::arithmetic::FieldExt;
+use halo2::arithmetic::{FieldExt, BaseExt};
 use halo2::circuit::Region;
 use halo2::plonk::Error;
 
-impl<W: FieldExt, N: FieldExt> IntegerChip<W, N> {
+impl<W: BaseExt, N: FieldExt> IntegerChip<W, N> {
     pub(super) fn _invert(
         &self,
         region: &mut Region<'_, N>,

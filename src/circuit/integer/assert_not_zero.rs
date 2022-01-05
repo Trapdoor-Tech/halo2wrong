@@ -1,13 +1,13 @@
 use super::IntegerChip;
 use crate::circuit::main_gate::{CombinationOption, MainGateInstructions, Term};
 use crate::circuit::{AssignedInteger, AssignedValue};
-use halo2::arithmetic::FieldExt;
+use halo2::arithmetic::{FieldExt, BaseExt};
 use halo2::circuit::Region;
 use halo2::plonk::Error;
 use num_bigint::BigUint as big_uint;
 use std::convert::TryInto;
 
-impl<W: FieldExt, N: FieldExt> IntegerChip<W, N> {
+impl<W: BaseExt, N: FieldExt> IntegerChip<W, N> {
     pub(super) fn _assert_not_zero(&self, region: &mut Region<'_, N>, a: &AssignedInteger<N>, offset: &mut usize) -> Result<(), Error> {
         let main_gate = self.main_gate();
         let (zero, one) = (N::zero(), N::one());
