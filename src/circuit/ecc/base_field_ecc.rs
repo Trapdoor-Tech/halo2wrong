@@ -1,15 +1,16 @@
 use crate::circuit::ecc::general_ecc::{GeneralEccChip, GeneralEccInstruction};
 use crate::circuit::integer::{IntegerChip, IntegerInstructions};
-use crate::circuit::main_gate::{MainGate, MainGateInstructions};
+use crate::circuit::main_gate::{MainGate, MainGateConfig, MainGateInstructions};
 use crate::circuit::{AssignedCondition, AssignedValue};
 use crate::rns::{Integer, Rns};
 use halo2::arithmetic::{CurveAffine, Field};
 use halo2::circuit::Region;
-use halo2::plonk::Error;
+use halo2::plonk::{ConstraintSystem, Error};
 
 use super::EccConfig;
 
 use crate::circuit::ecc::{AssignedPoint, Point};
+use crate::circuit::range::RangeChip;
 
 pub trait BaseFieldEccInstruction<C: CurveAffine> {
     fn assign_point(&self, region: &mut Region<'_, C::ScalarExt>, point: Option<C>, offset: &mut usize) -> Result<AssignedPoint<C::ScalarExt>, Error>;
@@ -95,6 +96,15 @@ impl<C: CurveAffine> BaseFieldEccChip<C> {
         let rns_ext = Rns::<C::ScalarExt, C::ScalarExt>::construct(rns.bit_len_limb);
         let general_chip = GeneralEccChip::new(config, rns, rns_ext)?;
         Ok(Self::from_general(general_chip))
+    }
+
+    pub fn configure(meta: &mut ConstraintSystem<C::ScalarExt>, main_gate_config: MainGateConfig, fine_tune_lengths: Vec<usize>, rns: Rns<C::Base, C::ScalarExt>) -> EccConfig {
+        let range_config = RangeChip::configure(meta, &main_gate_config, fine_tune_lengths);
+
+        EccConfig {
+            range_config,
+            main_gate_config,
+        }
     }
 
     fn integer_chip(&self) -> IntegerChip<C::Base, C::ScalarExt> {
