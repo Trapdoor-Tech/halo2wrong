@@ -69,6 +69,7 @@ pub trait BaseFieldEccInstruction<C: CurveAffine> {
     ) -> Result<AssignedPoint<C::ScalarExt>, Error>;
 }
 
+#[derive(Clone)]
 pub struct BaseFieldEccChip<C: CurveAffine> {
     config: EccConfig,
     rns: Rns<C::Base, C::ScalarExt>,
@@ -90,7 +91,7 @@ impl<C: CurveAffine> BaseFieldEccChip<C> {
         }
     }
 
-    fn new(config: EccConfig, rns: Rns<C::Base, C::ScalarExt>) -> Result<Self, Error> {
+    pub fn new(config: EccConfig, rns: Rns<C::Base, C::ScalarExt>) -> Result<Self, Error> {
         let rns_ext = Rns::<C::ScalarExt, C::ScalarExt>::construct(rns.bit_len_limb);
         let general_chip = GeneralEccChip::new(config, rns, rns_ext)?;
         Ok(Self::from_general(general_chip))
