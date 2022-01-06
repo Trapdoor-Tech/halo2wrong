@@ -228,7 +228,7 @@ impl<F: FieldExt> From<Option<F>> for UnassignedValue<F> {
 }
 
 impl<F: FieldExt> UnassignedValue<F> {
-    fn new(value: Option<F>) -> Self {
+    pub fn new(value: Option<F>) -> Self {
         UnassignedValue { value }
     }
 
