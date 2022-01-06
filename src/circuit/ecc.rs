@@ -79,6 +79,13 @@ pub struct EccConfig {
 }
 
 impl EccConfig {
+    pub fn new(main_gate_config: MainGateConfig, range_config: RangeConfig) -> Self {
+        Self {
+            main_gate_config,
+            range_config,
+        }
+    }
+
     fn integer_chip_config(&self) -> IntegerConfig {
         IntegerConfig::new(self.range_config.clone(), self.main_gate_config.clone())
     }

@@ -7,8 +7,8 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-halo2 = { git = "ssh://git@github.com/Trapdoor-Tech/halo2.git", branch = "kzg-agg" }
-#halo2 = { path = '../halo2', features = []}
+#halo2 = { git = "ssh://git@github.com/Trapdoor-Tech/halo2.git", branch = "kzg-agg" }
+halo2 = { path = '../halo2', features = []}
 num-bigint = { version = "0.4", features = ["rand"] }
 num-integer = "0.1"
 num-traits = "0.2"
