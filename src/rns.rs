@@ -175,7 +175,7 @@ impl<W: FieldExt, N: FieldExt> Rns<W, N> {
         base_aux
     }
 
-    pub(crate) fn construct(bit_len_limb: usize) -> Self {
+    pub fn construct(bit_len_limb: usize) -> Self {
         let one = &big_uint::one();
 
         let binary_modulus_bit_len = bit_len_limb * NUMBER_OF_LIMBS;
