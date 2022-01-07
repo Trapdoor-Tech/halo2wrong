@@ -35,6 +35,14 @@ impl<N: FieldExt> AssignedPoint<N> {
             z: flag.clone(),
         }
     }
+
+    pub fn x(&self) -> &AssignedInteger<N> {
+        &self.x
+    }
+
+    pub fn y(&self) -> &AssignedInteger<N> {
+        &self.y
+    }
 }
 
 #[derive(Clone, Debug)]
