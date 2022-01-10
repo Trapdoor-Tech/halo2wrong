@@ -1,12 +1,12 @@
 use crate::{NUMBER_OF_LIMBS, NUMBER_OF_LOOKUP_LIMBS};
-use halo2::arithmetic::{FieldExt, BaseExt};
+use halo2::arithmetic::{BaseExt, FieldExt};
 use num_bigint::BigUint as big_uint;
 use num_integer::Integer as _;
 use num_traits::{Num, One, Zero};
 use std::fmt;
+use std::io::BufReader;
 use std::marker::PhantomData;
 use std::ops::Shl;
-use std::io::BufReader;
 
 pub fn decompose_fe<F: FieldExt>(e: F, number_of_limbs: usize, bit_len: usize) -> Vec<F> {
     decompose(fe_to_big(e), number_of_limbs, bit_len)

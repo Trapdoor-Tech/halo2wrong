@@ -1,7 +1,7 @@
 use super::{IntegerChip, IntegerInstructions, Range};
 use crate::circuit::main_gate::{CombinationOption, MainGateInstructions, Term};
 use crate::circuit::{AssignedInteger, AssignedValue};
-use halo2::arithmetic::{FieldExt, BaseExt};
+use halo2::arithmetic::{BaseExt, FieldExt};
 use halo2::circuit::Region;
 use halo2::plonk::Error;
 

@@ -5,7 +5,7 @@ use crate::circuit::{AssignedInteger, AssignedLimb, AssignedValue, UnassignedInt
 use crate::rns::Common;
 use crate::rns::Integer;
 use crate::NUMBER_OF_LIMBS;
-use halo2::arithmetic::{FieldExt, BaseExt};
+use halo2::arithmetic::{BaseExt, FieldExt};
 use halo2::circuit::Region;
 use halo2::plonk::Error;
 use num_bigint::BigUint as big_uint;

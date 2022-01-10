@@ -246,7 +246,6 @@ impl<F: FieldExt> MainGateInstructions<F> for MainGate<F> {
         )?;
 
         Ok(AssignedValue::new(cell, b))
-
     }
     fn add(&self, region: &mut Region<'_, F>, a: impl Assigned<F>, b: impl Assigned<F>, offset: &mut usize) -> Result<AssignedValue<F>, Error> {
         self.add_with_constant(region, a, b, F::zero(), offset)
@@ -400,7 +399,7 @@ impl<F: FieldExt> MainGateInstructions<F> for MainGate<F> {
 
     fn mul_by_constant(&self, region: &mut Region<'_, F>, a: impl Assigned<F>, b: F, offset: &mut usize) -> Result<AssignedValue<F>, Error> {
         let c = match a.value() {
-            Some(a) => Some(a*b),
+            Some(a) => Some(a * b),
             _ => None,
         };
 
@@ -1087,7 +1086,7 @@ impl<F: FieldExt> MainGateInstructions<F> for MainGate<F> {
         region: &mut Region<'_, F>,
         unassigned: &UnassignedValue<F>,
         column: MainGateColumn,
-        offset: &mut usize
+        offset: &mut usize,
     ) -> Result<AssignedValue<F>, Error> {
         let mut coeffs = vec![F::zero(), F::zero(), F::zero(), F::zero()];
         let mut neg_one = F::one();

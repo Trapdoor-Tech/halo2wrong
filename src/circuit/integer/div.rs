@@ -2,7 +2,7 @@ use super::AssignedCondition;
 use super::IntegerChip;
 use super::IntegerInstructions;
 use crate::circuit::AssignedInteger;
-use halo2::arithmetic::{FieldExt, BaseExt};
+use halo2::arithmetic::{BaseExt, FieldExt};
 use halo2::circuit::Region;
 use halo2::plonk::Error;
 

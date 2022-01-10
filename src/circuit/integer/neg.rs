@@ -3,7 +3,7 @@ use crate::circuit::main_gate::MainGateInstructions;
 use crate::circuit::{AssignedInteger, AssignedLimb};
 use crate::rns::{fe_to_big, Common};
 use crate::NUMBER_OF_LIMBS;
-use halo2::arithmetic::{FieldExt, BaseExt};
+use halo2::arithmetic::{BaseExt, FieldExt};
 use halo2::circuit::Region;
 use halo2::plonk::Error;
 

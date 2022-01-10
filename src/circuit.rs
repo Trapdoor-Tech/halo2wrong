@@ -10,7 +10,7 @@ use std::marker::PhantomData;
 pub mod ecc;
 mod integer;
 pub mod main_gate;
-mod range;
+pub mod range;
 
 pub trait Assigned<F: FieldExt> {
     fn value(&self) -> Option<F>;

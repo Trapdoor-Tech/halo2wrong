@@ -98,7 +98,12 @@ impl<C: CurveAffine> BaseFieldEccChip<C> {
         Ok(Self::from_general(general_chip))
     }
 
-    pub fn configure(meta: &mut ConstraintSystem<C::ScalarExt>, main_gate_config: MainGateConfig, fine_tune_lengths: Vec<usize>, rns: Rns<C::Base, C::ScalarExt>) -> EccConfig {
+    pub fn configure(
+        meta: &mut ConstraintSystem<C::ScalarExt>,
+        main_gate_config: MainGateConfig,
+        fine_tune_lengths: Vec<usize>,
+        rns: Rns<C::Base, C::ScalarExt>,
+    ) -> EccConfig {
         let range_config = RangeChip::configure(meta, &main_gate_config, fine_tune_lengths);
 
         EccConfig {
