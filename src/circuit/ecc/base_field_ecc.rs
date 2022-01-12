@@ -1,8 +1,8 @@
 use crate::circuit::ecc::general_ecc::{GeneralEccChip, GeneralEccInstruction};
 use crate::circuit::integer::{IntegerChip, IntegerInstructions};
 use crate::circuit::main_gate::{MainGate, MainGateConfig, MainGateInstructions};
-use crate::circuit::{AssignedCondition, AssignedValue};
-use crate::rns::{Integer, Rns};
+use crate::circuit::{Assigned, AssignedCondition, AssignedInteger, AssignedLimb, AssignedValue};
+use crate::rns::{decompose_fe, Integer, Limb, Rns};
 use halo2::arithmetic::{CurveAffine, Field};
 use halo2::circuit::Region;
 use halo2::plonk::{ConstraintSystem, Error};
@@ -156,7 +156,7 @@ impl<C: CurveAffine> BaseFieldEccInstruction<C> for BaseFieldEccChip<C> {
         let point = point.map(|point| self.into_rns_point(point));
         // FIX: This won't help for a prover assigns the infinity
         // assert!(!point.is_identity);
-        point.as_ref().map(|point| assert!(point.is_identity)).unwrap();
+        // point.as_ref().map(|point| assert!(point.is_identity)).unwrap();
         let px = point.as_ref().map(|point| point.x.clone());
         let py = point.as_ref().map(|point| point.y.clone());
         let pz = point.as_ref().map(|_| C::ScalarExt::zero());
@@ -239,7 +239,7 @@ impl<C: CurveAffine> BaseFieldEccInstruction<C> for BaseFieldEccChip<C> {
     }
 
     fn double(&self, region: &mut Region<'_, C::ScalarExt>, p: AssignedPoint<C::ScalarExt>, offset: &mut usize) -> Result<AssignedPoint<C::ScalarExt>, Error> {
-        unimplemented!();
+        self.as_general()._double(region, &p, offset)
     }
 
     fn mul_var(
@@ -249,7 +249,12 @@ impl<C: CurveAffine> BaseFieldEccInstruction<C> for BaseFieldEccChip<C> {
         e: AssignedValue<C::ScalarExt>,
         offset: &mut usize,
     ) -> Result<AssignedPoint<C::ScalarExt>, Error> {
-        unimplemented!();
+        let limbs = e
+            .decompose(4, self.rns.bit_len_limb)
+            .map(|limbs| limbs.into_iter().map(|limb| Limb::new(limb)).collect::<Vec<Limb<C::ScalarExt>>>());
+        let e = limbs.map(|limbs| Integer::new(limbs, self.rns.bit_len_limb));
+        let e = self.integer_chip().assign_integer(region, e, offset)?;
+        self.as_general()._mul_var(region, p, e, offset)
     }
 
     fn mul_fix(

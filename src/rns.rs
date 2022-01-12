@@ -59,9 +59,12 @@ fn modulus<F: BaseExt>() -> big_uint {
 
 pub fn big_to_fe<F: BaseExt>(e: big_uint) -> F {
     let tmp = e.to_bytes_le();
-    let mut tmp = BufReader::new(&tmp[..]);
-    F::read(&mut tmp).unwrap()
-    //F::from_str_vartime(&e.to_str_radix(10)[..]).unwrap()
+    let mut bytes = [0u8; 64];
+    bytes[0..tmp.len()].copy_from_slice(&tmp);
+    // let mut tmp = BufReader::new(&tmp[..]);
+    // F::read(&mut tmp).unwrap()
+    // F::from_str_vartime(&e.to_str_radix(10)[..]).unwrap()
+    F::from_bytes_wide(&bytes)
 }
 
 impl<N: FieldExt> From<Integer<N>> for big_uint {
