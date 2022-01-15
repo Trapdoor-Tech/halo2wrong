@@ -7,7 +7,7 @@ use crate::rns::{Common, Integer, Rns};
 use crate::{NUMBER_OF_LIMBS, NUMBER_OF_LOOKUP_LIMBS};
 use halo2::arithmetic::{BaseExt, FieldExt};
 use halo2::circuit::Region;
-use halo2::plonk::Error;
+use halo2::plonk::{Column, Error, Instance};
 
 mod add;
 mod assert_in_field;
@@ -56,6 +56,14 @@ impl<W: BaseExt, N: FieldExt> IntegerChip<W, N> {
 
 pub trait IntegerInstructions<N: FieldExt> {
     fn assign_integer(&self, region: &mut Region<'_, N>, integer: Option<Integer<N>>, offset: &mut usize) -> Result<AssignedInteger<N>, Error>;
+    fn assign_integer_from_instance(
+        &self,
+        region: &mut Region<'_, N>,
+        instance_column: Column<Instance>,
+        row: usize,
+        offset: &mut usize,
+    ) -> Result<AssignedInteger<N>, Error>;
+
     fn range_assign_integer(
         &self,
         region: &mut Region<'_, N>,
@@ -263,6 +271,16 @@ impl<W: BaseExt, N: FieldExt> IntegerInstructions<N> for IntegerChip<W, N> {
         self._assign_integer(region, integer, offset, true)
     }
 
+    fn assign_integer_from_instance(
+        &self,
+        region: &mut Region<'_, N>,
+        instance_column: Column<Instance>,
+        row: usize,
+        offset: &mut usize,
+    ) -> Result<AssignedInteger<N>, Error> {
+        self._assign_integer_from_instance(region, instance_column, row, offset)
+    }
+
     fn assert_equal(&self, region: &mut Region<'_, N>, a: &AssignedInteger<N>, b: &AssignedInteger<N>, offset: &mut usize) -> Result<(), Error> {
         let c = &self.sub(region, a, b, offset)?;
         self.assert_zero(region, c, offset)?;
@@ -377,7 +395,7 @@ impl<W: BaseExt, N: FieldExt> IntegerChip<W, N> {
         IntegerChip { config, rns }
     }
 
-    fn range_chip(&self) -> RangeChip<N> {
+    pub fn range_chip(&self) -> RangeChip<N> {
         let bit_len_lookup = self.rns.bit_len_limb / NUMBER_OF_LOOKUP_LIMBS;
         RangeChip::<N>::new(self.config.range_config.clone(), bit_len_lookup)
     }

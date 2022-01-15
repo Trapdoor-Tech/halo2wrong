@@ -7,7 +7,7 @@ use crate::rns::Integer;
 use crate::NUMBER_OF_LIMBS;
 use halo2::arithmetic::{BaseExt, FieldExt};
 use halo2::circuit::Region;
-use halo2::plonk::Error;
+use halo2::plonk::{Column, Error, Instance};
 use num_bigint::BigUint as big_uint;
 use num_traits::One;
 
@@ -74,6 +74,73 @@ impl<W: BaseExt, N: FieldExt> IntegerChip<W, N> {
         let native_value = native_value.assign(native_value_cell);
 
         Ok(self.new_assigned_integer(vec![limb_0.clone(), limb_1.clone(), limb_2.clone(), limb_3.clone()], native_value))
+    }
+
+    pub(super) fn _assign_integer_from_instance(
+        &self,
+        region: &mut Region<'_, N>,
+        instance_column: Column<Instance>,
+        row: usize,
+        offset: &mut usize,
+    ) -> Result<AssignedInteger<N>, Error> {
+        let main_gate = self.main_gate();
+        let main_gate_config = self.config.main_gate_config.clone();
+        let (cell_0, val_0) = region.assign_advice_from_instance(|| "limb_0", instance_column, row, main_gate_config.a, *offset)?;
+        let (cell_1, val_1) = region.assign_advice_from_instance(|| "limb_1", instance_column, row + 1, main_gate_config.b, *offset)?;
+        let (cell_2, val_2) = region.assign_advice_from_instance(|| "limb_2", instance_column, row + 2, main_gate_config.c, *offset)?;
+        let (cell_3, val_3) = region.assign_advice_from_instance(|| "limb_3", instance_column, row + 3, main_gate_config.d, *offset)?;
+
+        let (zero, one) = (N::zero(), N::one());
+        let r = self.rns.left_shifter_r;
+        let rr = self.rns.left_shifter_2r;
+        let rrr = self.rns.left_shifter_3r;
+
+        // 1*cell0 + r*cell1 + rr*cell2 + rrr*cell3 - native_value = 0
+        let native_value: Option<N> = val_0
+            .zip(val_1)
+            .zip(val_2)
+            .zip(val_3)
+            .map(|(((val_0, val_1), val_2), val_3)| one * val_0 + r * val_1 + rr * val_2 + rrr * val_3);
+        region.assign_fixed(|| "base_0", main_gate_config.sa, *offset, || Ok(one))?;
+        region.assign_fixed(|| "base_1", main_gate_config.sb, *offset, || Ok(r))?;
+        region.assign_fixed(|| "base_2", main_gate_config.sc, *offset, || Ok(rr))?;
+        region.assign_fixed(|| "base_3", main_gate_config.sd, *offset, || Ok(rrr))?;
+
+        region.assign_fixed(|| "s_constant", main_gate_config.s_constant, *offset, || Ok(zero))?;
+        region.assign_fixed(|| "sd_next", main_gate_config.sd_next, *offset, || Ok(-one))?;
+        region.assign_fixed(|| "s_mul", main_gate_config.s_mul, *offset, || Ok(zero))?;
+        *offset += 1;
+
+        let (_, _, _, native_value_cell) = main_gate.combine(
+            region,
+            Term::Zero,
+            Term::Zero,
+            Term::Zero,
+            Term::Unassigned(native_value, zero),
+            zero,
+            offset,
+            CombinationOption::SingleLinerAdd,
+        )?;
+
+        let cells = vec![cell_0, cell_1, cell_2, cell_3];
+        let vals = vec![val_0, val_1, val_2, val_3];
+
+        let limbs = cells
+            .iter()
+            .zip(vals.into_iter())
+            .map(|(cell, value)| {
+                let max_val = self.rns.max_unreduced_limb.clone();
+
+                AssignedLimb::new(*cell, value, max_val)
+            })
+            .collect();
+
+        let native_value = AssignedValue {
+            value: native_value,
+            cell: native_value_cell,
+        };
+
+        Ok(self.new_assigned_integer(limbs, native_value))
     }
 
     pub(super) fn _assign_integer(

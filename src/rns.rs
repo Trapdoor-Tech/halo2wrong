@@ -575,7 +575,7 @@ impl<W: BaseExt, N: FieldExt> Rns<W, N> {
         self.new_from_limbs(aux_limbs)
     }
 
-    pub(crate) fn overflow_lengths(&self) -> Vec<usize> {
+    pub fn overflow_lengths(&self) -> Vec<usize> {
         let max_most_significant_mul_quotient_limb_size = self.max_most_significant_mul_quotient_limb.bits() as usize % self.bit_len_lookup;
         let max_most_significant_operand_limb_size = self.max_most_significant_operand_limb.bits() as usize % self.bit_len_lookup;
         let max_most_significant_reduced_limb_size = self.max_most_significant_reduced_limb.bits() as usize % self.bit_len_lookup;

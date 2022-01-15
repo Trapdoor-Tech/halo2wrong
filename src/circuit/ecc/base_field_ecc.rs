@@ -1,8 +1,9 @@
 use crate::circuit::ecc::general_ecc::{GeneralEccChip, GeneralEccInstruction};
+use halo2::arithmetic::BaseExt;
 use crate::circuit::integer::{IntegerChip, IntegerInstructions};
 use crate::circuit::main_gate::{MainGate, MainGateConfig, MainGateInstructions};
 use crate::circuit::{Assigned, AssignedCondition, AssignedInteger, AssignedLimb, AssignedValue};
-use crate::rns::{decompose_fe, Integer, Limb, Rns};
+use crate::rns::{compose, decompose_fe, fe_to_big, Integer, Limb, Rns};
 use halo2::arithmetic::{CurveAffine, Field};
 use halo2::circuit::Region;
 use halo2::plonk::{ConstraintSystem, Error};
@@ -112,7 +113,7 @@ impl<C: CurveAffine> BaseFieldEccChip<C> {
         }
     }
 
-    fn integer_chip(&self) -> IntegerChip<C::Base, C::ScalarExt> {
+    pub fn integer_chip(&self) -> IntegerChip<C::Base, C::ScalarExt> {
         let integer_chip_config = self.config.integer_chip_config();
         IntegerChip::<C::Base, C::ScalarExt>::new(integer_chip_config, self.rns.clone())
     }
