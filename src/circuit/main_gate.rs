@@ -237,7 +237,7 @@ impl<F: FieldExt> MainGateInstructions<F> for MainGate<F> {
         let (_, _, cell, _) = self.combine(
             region,
             Term::Assigned(&a, one),
-            Term::Unassigned(b, -one),
+            Term::Unassigned(b, one),
             Term::Zero,
             Term::Zero,
             F::zero(),
@@ -1105,7 +1105,7 @@ impl<F: FieldExt> MainGateInstructions<F> for MainGate<F> {
         region.assign_fixed(|| "sc", self.config.sc, *offset, || Ok(coeffs[2]))?;
         region.assign_fixed(|| "sd", self.config.sd, *offset, || Ok(coeffs[3]))?;
         region.assign_fixed(|| "sd_next", self.config.sd_next, *offset, || Ok(F::zero()))?;
-        region.assign_fixed(|| "s_constant", self.config.s_constant, *offset, || unassigned.value())?;
+        region.assign_fixed(|| "s_constant", self.config.s_constant, *offset, || unassigned.value().map(|v| v.neg()))?;
         *offset = *offset + 1;
 
         Ok(unassigned.assign(cell))
