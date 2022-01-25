@@ -1,3 +1,4 @@
+use std::fmt::{Debug, Pointer};
 use crate::rns::{compose, decompose_fe as decompose, fe_to_big, Common, Integer, Limb};
 use halo2::plonk::Error;
 use halo2::{
@@ -127,11 +128,19 @@ impl<F: FieldExt> UnassignedInteger<F> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AssignedInteger<F: FieldExt> {
     limbs: Vec<AssignedLimb<F>>,
     native_value: AssignedValue<F>,
     bit_len_limb: usize,
+}
+
+impl<F: FieldExt> std::fmt::Debug for AssignedInteger<F> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        let limb_vals = self.limbs.iter().map(|limb| limb.value().map(|v| fe_to_big(v))).collect::<Option<Vec<_>>>();
+        let origin_val = limb_vals.map(|limbs| compose(limbs, self.bit_len_limb).to_str_radix(16));
+        origin_val.fmt(f)
+    }
 }
 
 impl<F: FieldExt> AssignedInteger<F> {
@@ -171,12 +180,17 @@ impl<F: FieldExt> AssignedInteger<F> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AssignedValue<F: FieldExt> {
     pub value: Option<F>,
     cell: Cell,
 }
 
+impl<F: FieldExt> std::fmt::Debug for AssignedValue<F> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        self.value.fmt(f)
+    }
+}
 impl<F: FieldExt> From<AssignedCondition<F>> for AssignedValue<F> {
     fn from(cond: AssignedCondition<F>) -> Self {
         AssignedValue {

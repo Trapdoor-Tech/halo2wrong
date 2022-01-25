@@ -19,12 +19,21 @@ pub struct Point<N: FieldExt> {
     is_identity: bool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct AssignedPoint<N: FieldExt> {
     x: AssignedInteger<N>,
     y: AssignedInteger<N>,
     // indicate whether the poinit is the identity point of curve or not
     z: AssignedCondition<N>,
+}
+
+impl<F: FieldExt> std::fmt::Debug for AssignedPoint<F> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        f.debug_struct("assigned_point")
+            .field("x", &self.x)
+            .field("y", &self.y)
+            .finish()
+    }
 }
 
 impl<N: FieldExt> AssignedPoint<N> {
