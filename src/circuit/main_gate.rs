@@ -234,7 +234,7 @@ impl<F: FieldExt> MainGateInstructions<F> for MainGate<F> {
 
         let one = F::one();
 
-        let (_, _, cell, _) = self.combine(
+        let (_, cell, _, _) = self.combine(
             region,
             Term::Assigned(&a, one),
             Term::Unassigned(b, one),
